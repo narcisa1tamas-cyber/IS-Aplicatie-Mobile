@@ -14,23 +14,25 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.is_aplicatie_mobile.model.LoginResponse // Adăugat importul pentru LoginResponse
+import com.example.is_aplicatie_mobile.model.LoginResponse
 import com.example.is_aplicatie_mobile.ui.theme.*
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
 import com.example.is_aplicatie_mobile.viewmodel.LoginState
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (LoginResponse) -> Unit, // Modificat pentru a primi obiectul LoginResponse
+    onLoginSuccess: (LoginResponse) -> Unit,
     authViewModel: AuthViewModel = viewModel()
 ) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
-    // Colectăm starea curentă a logării
     val loginState by authViewModel.loginState.collectAsState()
 
-    // Navigăm dacă succes și trimitem datele utilizatorului
+    LaunchedEffect(Unit) {
+        authViewModel.resetLoginState()
+    }
+
     LaunchedEffect(loginState) {
         if (loginState is LoginState.Success) {
             onLoginSuccess((loginState as LoginState.Success).user)
@@ -65,7 +67,13 @@ fun LoginScreen(
                     value = username,
                     onValueChange = { username = it },
                     label = { Text("Utilizator (Medic/Asistent)") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = MedicalBlue) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            tint = MedicalBlue
+                        )
+                    },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
@@ -77,14 +85,19 @@ fun LoginScreen(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Parolă") },
-                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = MedicalBlue) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MedicalBlue
+                        )
+                    },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
                 )
 
-                // Afișăm un mesaj de eroare dacă logarea a eșuat
                 if (loginState is LoginState.Error) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -101,18 +114,21 @@ fun LoginScreen(
         Button(
             onClick = {
                 if (username.isNotBlank() && password.isNotBlank()) {
-                    // Apelăm funcția din ViewModel care face verificarea
                     authViewModel.login(username, password)
                 }
             },
-            modifier = Modifier.fillMaxWidth().height(55.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(55.dp),
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue),
-            // Dezactivăm butonul în timp ce se încarcă
             enabled = loginState !is LoginState.Loading
         ) {
             if (loginState is LoginState.Loading) {
-                CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(24.dp))
+                CircularProgressIndicator(
+                    color = PureWhite,
+                    modifier = Modifier.size(24.dp)
+                )
             } else {
                 Text("CONECTARE", fontWeight = FontWeight.Bold)
             }

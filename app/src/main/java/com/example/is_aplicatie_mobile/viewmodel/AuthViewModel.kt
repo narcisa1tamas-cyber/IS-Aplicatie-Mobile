@@ -24,10 +24,8 @@ class AuthViewModel : ViewModel() {
         _loginState.value = LoginState.Loading
 
         viewModelScope.launch {
-            // Simulăm o scurtă întârziere pentru "efectul" de încărcare de la server
             delay(1000)
 
-            // VERIFICARE DATE HARDCODATE
             when {
                 username == "asistenta" && parola == "parola123" -> {
                     _loginState.value = LoginState.Success(
@@ -39,6 +37,7 @@ class AuthViewModel : ViewModel() {
                         )
                     )
                 }
+
                 username == "admin" && parola == "admin123" -> {
                     _loginState.value = LoginState.Success(
                         LoginResponse(
@@ -49,10 +48,17 @@ class AuthViewModel : ViewModel() {
                         )
                     )
                 }
+
                 else -> {
-                    _loginState.value = LoginState.Error("Date incorecte! Conturi test: asistenta/parola123 sau admin/admin123.")
+                    _loginState.value = LoginState.Error(
+                        "Date incorecte! Conturi test: asistenta/parola123 sau admin/admin123."
+                    )
                 }
             }
         }
+    }
+
+    fun resetLoginState() {
+        _loginState.value = LoginState.Idle
     }
 }

@@ -46,7 +46,7 @@ fun SplashScreen(onContinue: () -> Unit) {
             }
             Spacer(modifier = Modifier.height(24.dp))
             Text(
-                text = "Sănătatea Noastră",
+                text = "HospiHelp",
                 style = MaterialTheme.typography.headlineMedium,
                 color = MedicalBlue,
                 fontWeight = FontWeight.Bold

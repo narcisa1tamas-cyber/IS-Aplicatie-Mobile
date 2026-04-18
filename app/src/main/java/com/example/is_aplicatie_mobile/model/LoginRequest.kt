@@ -1,4 +1,6 @@
 package com.example.is_aplicatie_mobile.model
 
-class LoginRequest {
-}
+data class LoginRequest(
+    val username: String,
+    val parola_criptata: String
+)

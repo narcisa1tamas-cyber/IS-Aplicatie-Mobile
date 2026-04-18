@@ -2,6 +2,7 @@ package com.example.is_aplicatie_mobile.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List // Importul corect pentru iconița nouă
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -12,7 +13,7 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MedBotApp() {
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("Dashboard", "Control", "Inventory", "Logs")
 
     Scaffold(
@@ -26,12 +27,12 @@ fun MedBotApp() {
                     }
                 },
                 actions = {
-                    // Status baterie robot [cite: 23]
+                    // Status baterie robot
                     Icon(Icons.Default.BatteryFull, contentDescription = "Battery", tint = Color.Green)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("85%", color = Color.White)
                     Spacer(modifier = Modifier.width(16.dp))
-                    // Status conexiune Bluetooth [cite: 24]
+                    // Status conexiune Bluetooth
                     Icon(Icons.Default.Bluetooth, contentDescription = "Bluetooth", tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
                 }
@@ -52,7 +53,7 @@ fun MedBotApp() {
                     onClick = { selectedTab = 1 }
                 )
                 NavigationBarItem(
-                    icon = { Icon(Icons.Default.List, contentDescription = "Inventory") },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Inventory") }, // Iconița actualizată
                     label = { Text("Inventory") },
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 }
@@ -68,8 +69,8 @@ fun MedBotApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (selectedTab) {
-                0 -> DashboardScreen() // Va trebui să creezi această funcție
-                1 -> ControlScreen()   // Va trebui să creezi această funcție [cite: 26, 27]
+                0 -> DashboardScreen()
+                1 -> ControlScreen()
                 2 -> Text("Ecran Inventar (În lucru)", modifier = Modifier.padding(16.dp))
                 3 -> Text("Ecran Notificări (În lucru)", modifier = Modifier.padding(16.dp))
             }
@@ -77,6 +78,13 @@ fun MedBotApp() {
     }
 }
 
-// Funcții placeholder pentru a nu avea erori de compilare
-@Composable fun DashboardScreen() { Text("Statistici Robot și Pacienți", modifier = Modifier.padding(16.dp)) }
-@Composable fun ControlScreen() { Text("Control Teleghidat Robot", modifier = Modifier.padding(16.dp)) }
+// Funcțiile placeholder definite corect la finalul fișierului
+@Composable
+fun DashboardScreen() {
+    Text("Statistici Robot și Pacienți", modifier = Modifier.padding(16.dp))
+}
+
+@Composable
+fun ControlScreen() {
+    Text("Control Teleghidat Robot", modifier = Modifier.padding(16.dp))
+}

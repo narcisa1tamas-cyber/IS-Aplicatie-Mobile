@@ -5,16 +5,21 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import com.example.is_aplicatie_mobile.screens.LoginScreen
-import com.example.is_aplicatie_mobile.screens.MedBotApp
-import com.example.is_aplicatie_mobile.screens.SplashScreen
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.viewmodel.compose.viewModel
+
+// Importurile ecranelor
+import com.example.is_aplicatie_mobile.screens.*
 import com.example.is_aplicatie_mobile.ui.theme.ISAplicatieMobileTheme
+import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,33 +27,60 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ISAplicatieMobileTheme {
-                // Gestionăm starea navigării: "splash", "login" sau "main_app"
                 var currentScreen by remember { mutableStateOf("splash") }
+                var userRole by remember { mutableStateOf("") }
+                var selectedSalonId by remember { mutableIntStateOf(-1) }
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Box(modifier = Modifier.padding(innerPadding)) {
-                        when (currentScreen) {
-                            "splash" -> {
-                                SplashScreen(onContinue = { currentScreen = "login" })
-                            }
+                val nurseViewModel: NurseViewModel = viewModel()
 
-                            "login" -> {
-                                // Permite întoarcerea la logo cu butonul de Back
-                                BackHandler { currentScreen = "splash" }
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color(0xFFF1F5F9), Color(0xFFFFFFFF))
+                        )
+                    )
+                ) {
+                    Scaffold(
+                        containerColor = Color.Transparent,
+                        modifier = Modifier.fillMaxSize()
+                    ) { innerPadding ->
+                        Box(modifier = Modifier.padding(innerPadding)) {
+                            when (currentScreen) {
+                                "splash" -> SplashScreen(onContinue = { currentScreen = "login" })
 
-                                // Pasăm funcția onLoginSuccess pentru a naviga la aplicația principală
-                                LoginScreen(onLoginSuccess = {
-                                    currentScreen = "main_app"
-                                })
-                            }
+                                "login" -> {
+                                    BackHandler { currentScreen = "splash" }
+                                    LoginScreen(onLoginSuccess = { user ->
+                                        userRole = user.rol
+                                        currentScreen = if (userRole == "Asistent") "nurse_dashboard" else "main_app"
+                                    })
+                                }
 
-                            "main_app" -> {
-                                // Opțional: BackHandler aici te poate întoarce la Login
-                                // sau poate închide aplicația, depinde de preferință.
-                                BackHandler { currentScreen = "login" }
+                                "nurse_dashboard" -> {
+                                    BackHandler { currentScreen = "login" }
+                                    NurseDashboard(
+                                        viewModel = nurseViewModel,
+                                        onSalonSelected = { id ->
+                                            selectedSalonId = id
+                                            currentScreen = "ward_details"
+                                        }
+                                    )
+                                }
 
-                                // Afișăm interfața cu Dashboard, Control, Inventar și Logs
-                                MedBotApp()
+                                "ward_details" -> {
+                                    BackHandler { currentScreen = "nurse_dashboard" }
+                                    WardDetailScreen(
+                                        salonId = selectedSalonId,
+                                        viewModel = nurseViewModel,
+                                        onBack = { currentScreen = "nurse_dashboard" }
+                                    )
+                                }
+
+                                "main_app" -> {
+                                    BackHandler { currentScreen = "login" }
+                                    MedBotApp()
+                                }
                             }
                         }
                     }

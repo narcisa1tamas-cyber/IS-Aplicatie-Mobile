@@ -10,16 +10,32 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.is_aplicatie_mobile.model.LoginResponse // Adăugat importul pentru LoginResponse
 import com.example.is_aplicatie_mobile.ui.theme.*
+import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
+import com.example.is_aplicatie_mobile.viewmodel.LoginState
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) { // Am adăugat parametrul aici
+fun LoginScreen(
+    onLoginSuccess: (LoginResponse) -> Unit, // Modificat pentru a primi obiectul LoginResponse
+    authViewModel: AuthViewModel = viewModel()
+) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+
+    // Colectăm starea curentă a logării
+    val loginState by authViewModel.loginState.collectAsState()
+
+    // Navigăm dacă succes și trimitem datele utilizatorului
+    LaunchedEffect(loginState) {
+        if (loginState is LoginState.Success) {
+            onLoginSuccess((loginState as LoginState.Success).user)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -45,7 +61,6 @@ fun LoginScreen(onLoginSuccess: () -> Unit) { // Am adăugat parametrul aici
             elevation = CardDefaults.cardElevation(4.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // Numele introdus aici va fi identificatorul utilizatorului în Cloud
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
@@ -68,6 +83,16 @@ fun LoginScreen(onLoginSuccess: () -> Unit) { // Am adăugat parametrul aici
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true
                 )
+
+                // Afișăm un mesaj de eroare dacă logarea a eșuat
+                if (loginState is LoginState.Error) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = (loginState as LoginState.Error).message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
 
@@ -75,17 +100,22 @@ fun LoginScreen(onLoginSuccess: () -> Unit) { // Am adăugat parametrul aici
 
         Button(
             onClick = {
-                // Tema tehnică cere salvarea numelui în baza de date Cloud
-                // Momentan doar declanșăm navigarea către dashboard
-                if (username.isNotBlank()) {
-                    onLoginSuccess()
+                if (username.isNotBlank() && password.isNotBlank()) {
+                    // Apelăm funcția din ViewModel care face verificarea
+                    authViewModel.login(username, password)
                 }
             },
             modifier = Modifier.fillMaxWidth().height(55.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue)
+            colors = ButtonDefaults.buttonColors(containerColor = MedicalBlue),
+            // Dezactivăm butonul în timp ce se încarcă
+            enabled = loginState !is LoginState.Loading
         ) {
-            Text("CONECTARE", fontWeight = FontWeight.Bold)
+            if (loginState is LoginState.Loading) {
+                CircularProgressIndicator(color = PureWhite, modifier = Modifier.size(24.dp))
+            } else {
+                Text("CONECTARE", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

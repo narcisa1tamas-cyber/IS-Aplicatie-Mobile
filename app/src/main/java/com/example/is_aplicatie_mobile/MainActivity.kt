@@ -100,14 +100,20 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+
                                 "main_app" -> {
                                     BackHandler {
                                         authViewModel.resetLoginState()
                                         userRole = ""
                                         currentScreen = "login"
                                     }
-
-                                    MedBotApp()
+                                    MedBotApp(
+                                        onLogout = {
+                                            authViewModel.resetLoginState()
+                                            userRole = ""
+                                            currentScreen = "login"
+                                        }
+                                    )
                                 }
                             }
                         }

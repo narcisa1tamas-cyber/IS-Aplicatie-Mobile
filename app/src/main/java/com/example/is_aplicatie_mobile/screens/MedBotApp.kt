@@ -6,11 +6,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 
 @Composable
-fun MedBotApp(onLogout: () -> Unit) {
+fun MedBotApp(onLogout: () -> Unit,
+              onNavigateToReports: () -> Unit) {
     // Am eliminat Scaffold-ul care conținea bottomBar (bara de jos cu iconițe)
     // Administratorul va vedea direct ecranul de control, conform schiței
 
     Box(modifier = Modifier.fillMaxSize()) {
-        AdminDashboard(onLogout = onLogout)
+        AdminDashboard(onLogout = onLogout,
+            onNavigateToReports = onNavigateToReports)
+
     }
 }

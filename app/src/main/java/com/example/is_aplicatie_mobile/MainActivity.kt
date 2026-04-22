@@ -112,8 +112,13 @@ class MainActivity : ComponentActivity() {
                                             authViewModel.resetLoginState()
                                             userRole = ""
                                             currentScreen = "login"
-                                        }
+                                        } ,
+                                        onNavigateToReports = { currentScreen = "reports_page" }
                                     )
+                                }
+                                "reports_page" -> {
+                                    BackHandler { currentScreen = "main_app" }
+                                    ReportsScreen(onBack = { currentScreen = "main_app" })
                                 }
                             }
                         }

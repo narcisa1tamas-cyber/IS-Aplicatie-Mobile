@@ -66,7 +66,7 @@ fun LoginScreen(
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
-                    label = { Text("Utilizator (Medic/Asistent)") },
+                    label = { Text("Email") },
                     leadingIcon = {
                         Icon(
                             Icons.Default.Person,
@@ -114,7 +114,7 @@ fun LoginScreen(
         Button(
             onClick = {
                 if (username.isNotBlank() && password.isNotBlank()) {
-                    authViewModel.login(username, password)
+                    authViewModel.login(username.trim(), password.trim())
                 }
             },
             modifier = Modifier

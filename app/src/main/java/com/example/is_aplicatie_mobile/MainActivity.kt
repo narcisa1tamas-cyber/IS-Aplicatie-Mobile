@@ -15,10 +15,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.is_aplicatie_mobile.network.RetrofitClient
 import com.example.is_aplicatie_mobile.screens.*
 import com.example.is_aplicatie_mobile.ui.theme.ISAplicatieMobileTheme
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
+import com.example.is_aplicatie_mobile.viewmodel.AuthViewModelFactory
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
+import com.example.is_aplicatie_mobile.viewmodel.NurseViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -27,12 +30,22 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             ISAplicatieMobileTheme {
+                // State-uri pentru navigare și sesiune
                 var currentScreen by remember { mutableStateOf("splash") }
                 var userRole by remember { mutableStateOf("") }
+                var userToken by remember { mutableStateOf("") }
                 var selectedSalonId by remember { mutableIntStateOf(-1) }
 
-                val authViewModel: AuthViewModel = viewModel()
-                val nurseViewModel: NurseViewModel = viewModel()
+                // Initializare API Service
+                val apiService = RetrofitClient.instance
+
+                val authViewModel: AuthViewModel = viewModel(
+                    factory = AuthViewModelFactory(apiService)
+                )
+
+                val nurseViewModel: NurseViewModel = viewModel(
+                    factory = NurseViewModelFactory(apiService)
+                )
 
                 Box(
                     modifier = Modifier
@@ -55,13 +68,18 @@ class MainActivity : ComponentActivity() {
 
                                 "login" -> {
                                     BackHandler { currentScreen = "splash" }
-
                                     LoginScreen(
                                         onLoginSuccess = { user ->
                                             userRole = user.rol
-                                            currentScreen =
-                                                if (userRole == "Asistent") "nurse_dashboard"
-                                                else "main_app"
+                                            userToken = user.token
+
+                                            if (userRole == "ASISTENTA") {
+                                                nurseViewModel.loadSaloaneDinCloud(userToken)
+                                                currentScreen = "nurse_dashboard"
+                                            } else {
+                                                // Rol ADMIN / CONTROL ROBOT
+                                                currentScreen = "main_app"
+                                            }
                                         },
                                         authViewModel = authViewModel
                                     )
@@ -70,21 +88,17 @@ class MainActivity : ComponentActivity() {
                                 "nurse_dashboard" -> {
                                     BackHandler {
                                         authViewModel.resetLoginState()
-                                        userRole = ""
-                                        selectedSalonId = -1
                                         currentScreen = "login"
                                     }
-
                                     NurseDashboard(
                                         viewModel = nurseViewModel,
                                         onSalonSelected = { id ->
                                             selectedSalonId = id
+                                            nurseViewModel.loadPacientiPentruSalon(id, userToken)
                                             currentScreen = "ward_details"
                                         },
                                         onLogout = {
                                             authViewModel.resetLoginState()
-                                            userRole = ""
-                                            selectedSalonId = -1
                                             currentScreen = "login"
                                         }
                                     )
@@ -92,33 +106,41 @@ class MainActivity : ComponentActivity() {
 
                                 "ward_details" -> {
                                     BackHandler { currentScreen = "nurse_dashboard" }
-
                                     WardDetailScreen(
                                         salonId = selectedSalonId,
+                                        token = userToken,
                                         viewModel = nurseViewModel,
                                         onBack = { currentScreen = "nurse_dashboard" }
                                     )
                                 }
 
-
                                 "main_app" -> {
                                     BackHandler {
                                         authViewModel.resetLoginState()
-                                        userRole = ""
                                         currentScreen = "login"
                                     }
-                                    MedBotApp(
+                                    // Aici afișăm AdminDashboard (Control Robot)
+                                    AdminDashboard(
                                         onLogout = {
                                             authViewModel.resetLoginState()
-                                            userRole = ""
                                             currentScreen = "login"
-                                        } ,
-                                        onNavigateToReports = { currentScreen = "reports_page" }
+                                        },
+                                        onNavigateToReports = {
+                                            nurseViewModel.loadTransportCurent(userToken) // ACEASTA aduce toți pacienții
+                                            currentScreen = "admin_reports"
+                                        }
                                     )
                                 }
-                                "reports_page" -> {
+
+                                "admin_reports" -> {
+                                    // Butonul "Back" de pe telefon te duce înapoi la meniul robotului
                                     BackHandler { currentScreen = "main_app" }
-                                    ReportsScreen(onBack = { currentScreen = "main_app" })
+
+                                    ReportsScreen(
+                                        viewModel = nurseViewModel,
+                                        onBack = { currentScreen = "main_app" },
+                                        token = userToken
+                                    )
                                 }
                             }
                         }

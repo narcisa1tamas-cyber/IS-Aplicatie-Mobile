@@ -2,8 +2,9 @@ package com.example.is_aplicatie_mobile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.is_aplicatie_mobile.model.LoginRequest
 import com.example.is_aplicatie_mobile.model.LoginResponse
-import kotlinx.coroutines.delay
+import com.example.is_aplicatie_mobile.network.HospiHelpApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +17,7 @@ sealed class LoginState {
     data class Error(val message: String) : LoginState()
 }
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val apiService: HospiHelpApiService) : ViewModel() {
     private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
     val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
 
@@ -24,36 +25,24 @@ class AuthViewModel : ViewModel() {
         _loginState.value = LoginState.Loading
 
         viewModelScope.launch {
-            delay(1000)
+            try {
+                // Trimitem cererea către serverul Spring Boot
+                // Folosim email = username conform discuției noastre despre variabile
+                val request = LoginRequest(email = username.trim(), parola = parola.trim())
+                val response = apiService.login(request)
 
-            when {
-                username == "asistenta" && parola == "parola123" -> {
-                    _loginState.value = LoginState.Success(
-                        LoginResponse(
-                            id_angajat = 2,
-                            nume = "Maria Ionescu",
-                            rol = "Asistent",
-                            token = "fake-token-asistent"
-                        )
-                    )
+                if (response.isSuccessful && response.body() != null) {
+                    _loginState.value = LoginState.Success(response.body()!!)
+                } else {
+                    val errorMsg = when(response.code()) {
+                        401 -> "Email sau parolă incorectă!"
+                        404 -> "Serverul nu a fost găsit!"
+                        else -> "Eroare server: ${response.code()}"
+                    }
+                    _loginState.value = LoginState.Error(errorMsg)
                 }
-
-                username == "admin" && parola == "admin123" -> {
-                    _loginState.value = LoginState.Success(
-                        LoginResponse(
-                            id_angajat = 1,
-                            nume = "Popescu Ion",
-                            rol = "Administrator",
-                            token = "fake-token-admin"
-                        )
-                    )
-                }
-
-                else -> {
-                    _loginState.value = LoginState.Error(
-                        "Date incorecte! Conturi test: asistenta/parola123 sau admin/admin123."
-                    )
-                }
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error("Eroare de conexiune: Verificați dacă serverul și Wi-Fi-ul sunt pornite.")
             }
         }
     }

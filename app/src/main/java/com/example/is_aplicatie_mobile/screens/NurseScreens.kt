@@ -1,5 +1,7 @@
 package com.example.is_aplicatie_mobile.screens
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,21 +10,32 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MeetingRoom
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
+
+private val BackgroundColor = Color(0xFFF4F8FB)
+private val PrimaryBlue = Color(0xFF1976D2)
+private val DarkBlue = Color(0xFF0D47A1)
+private val SuccessGreen = Color(0xFF4CAF50)
+private val SoftBlue = Color(0xFFE3F2FD)
+private val SoftBorder = Color(0xFFE0EAF5)
 
 @Composable
 fun NurseDashboard(
@@ -30,66 +43,132 @@ fun NurseDashboard(
     onSalonSelected: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
+    val saloaneRaw by viewModel.saloane.collectAsState()
+
+    val saloaneVizibile = remember(saloaneRaw) {
+        saloaneRaw.distinctBy { it.nrSalon }
+    }
+
     Scaffold(
+        containerColor = BackgroundColor,
         topBar = {
-            Surface(shadowElevation = 3.dp) {
+            Surface(
+                color = Color.White,
+                shadowElevation = 4.dp
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Saloane Pacienți",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(SoftBlue),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalHospital,
+                            contentDescription = null,
+                            tint = PrimaryBlue
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "Saloane Pacienți",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = DarkBlue
+                        )
+
+                        Text(
+                            text = "Gestionare livrări active",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
+                        )
+                    }
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    IconButton(onClick = onLogout) {
+                    IconButton(
+                        onClick = onLogout,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFEBEE))
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Logout,
-                            contentDescription = "Logout"
+                            contentDescription = "Logout",
+                            tint = Color(0xFFC62828)
                         )
                     }
                 }
             }
         }
     ) { padding ->
+
         LazyVerticalGrid(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp),
+                .fillMaxSize()
+                .padding(18.dp),
             columns = GridCells.Fixed(2),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(viewModel.saloane) { salon ->
+            items(saloaneVizibile) { salon ->
                 Card(
                     modifier = Modifier
-                        .aspectRatio(1f)
-                        .clickable { onSalonSelected(salon.id) },
-                    shape = RoundedCornerShape(24.dp),
-                    elevation = CardDefaults.cardElevation(4.dp)
-                ) {
+                        .padding(4.dp)
+                        .fillMaxWidth()
+                        .height(160.dp)
+                        .clickable { onSalonSelected(salon.nrSalon) },
+                    shape = RoundedCornerShape(32.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(8.dp)
+                ){
                     Column(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(18.dp),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.MeetingRoom,
-                            contentDescription = null,
-                            tint = Color(0xFF1976D2),
-                            modifier = Modifier.size(40.dp)
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(62.dp)
+                                .clip(CircleShape)
+                                .background(SoftBlue),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MeetingRoom,
+                                contentDescription = null,
+                                tint = PrimaryBlue,
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
                         Text(
-                            text = salon.nume,
-                            fontWeight = FontWeight.Bold
+                            text = "Salon ${salon.nrSalon}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = DarkBlue
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Vezi comenzi",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray
                         )
                     }
                 }
@@ -101,6 +180,7 @@ fun NurseDashboard(
 @Composable
 fun WardDetailScreen(
     salonId: Int,
+    token: String,
     viewModel: NurseViewModel,
     onBack: () -> Unit
 ) {
@@ -109,7 +189,6 @@ fun WardDetailScreen(
     var showSuccessMessage by remember { mutableStateOf(false) }
 
     LaunchedEffect(salonId) {
-        viewModel.loadPacientiPentruSalon(salonId)
         pacientiSelectati = emptySet()
     }
 
@@ -125,51 +204,58 @@ fun WardDetailScreen(
                         onClick = {
                             showSuccessMessage = false
                             pacientiSelectati = emptySet()
-                        }
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                     ) {
-                        Text("ÎNȚELES")
+                        Text("ÎNȚELES", fontWeight = FontWeight.Bold)
                     }
                 }
             },
             icon = {
                 Icon(
-                    imageVector = Icons.Default.CheckCircle,
+                    Icons.Default.CheckCircle,
                     contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(70.dp)
+                    tint = SuccessGreen,
+                    modifier = Modifier.size(72.dp)
                 )
             },
             title = {
                 Text(
                     text = "Succes!",
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = DarkBlue
                 )
             },
             text = {
                 Text(
-                    text = "Preluarea medicamentelor a fost confirmată.",
+                    text = "Preluarea medicamentelor a fost confirmată în sistem.",
                     modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
                 )
-            }
+            },
+            shape = RoundedCornerShape(24.dp)
         )
     }
 
     Scaffold(
+        containerColor = BackgroundColor,
         topBar = {
-            Surface(shadowElevation = 3.dp) {
+            Surface(
+                color = Color.White,
+                shadowElevation = 4.dp
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                         Text("Saloane")
                     }
 
@@ -177,75 +263,134 @@ fun WardDetailScreen(
 
                     Text(
                         text = "Salon $salonId",
-                        fontWeight = FontWeight.Black
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = DarkBlue
                     )
                 }
             }
         },
         bottomBar = {
-            Button(
-                onClick = {
-                    viewModel.confirmaFinalizarePreluare(pacientiSelectati)
-                    showSuccessMessage = true
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-                    .height(56.dp),
-                enabled = pacientiSelectati.isNotEmpty()
+            Surface(
+                color = Color.White,
+                shadowElevation = 8.dp
             ) {
-                Text("CONFIRMĂ (${pacientiSelectati.size})")
+                Button(
+                    onClick = {
+                        viewModel.confirmaFinalizarePreluare(token, pacientiSelectati)
+                        showSuccessMessage = true
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .height(56.dp),
+                    shape = RoundedCornerShape(18.dp),
+                    enabled = pacientiSelectati.isNotEmpty(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
+                ) {
+                    Text(
+                        text = "CONFIRMĂ (${pacientiSelectati.size})",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     ) { padding ->
+
         LazyColumn(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(livrari) { livrare ->
+
                 val isSelected = pacientiSelectati.contains(livrare.numePacient)
-                val isFinalizat = livrare.status == "Finalizat"
+                val isFinalizat = livrare.status == "FINALIZAT"
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp)
+                        .border(
+                            width = 2.dp,
+                            color = if (isSelected) PrimaryBlue else SoftBorder,
+                            shape = RoundedCornerShape(24.dp)
+                        )
                         .clickable(enabled = !isFinalizat) {
                             pacientiSelectati =
-                                if (isSelected) {
-                                    pacientiSelectati - livrare.numePacient
-                                } else {
-                                    pacientiSelectati + livrare.numePacient
-                                }
-                        }
-                        .border(
-                            2.dp,
-                            if (isSelected) Color(0xFF1976D2) else Color.Transparent,
-                            RoundedCornerShape(20.dp)
-                        ),
+                                if (isSelected) pacientiSelectati - livrare.numePacient
+                                else pacientiSelectati + livrare.numePacient
+                        },
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) Color(0xFFE3F2FD) else Color.White
-                    )
+                        containerColor = when {
+                            isFinalizat -> Color(0xFFE8F5E9)
+                            isSelected -> SoftBlue
+                            else -> Color.White
+                        }
+                    ),
+                    elevation = CardDefaults.cardElevation(4.dp)
                 ) {
-                    Row(modifier = Modifier.padding(16.dp)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = livrare.numePacient,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Pat: ${livrare.pat} • 💊 ${livrare.medicament}",
-                                color = Color.Gray
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isSelected || isFinalizat) Color(0xFFC8E6C9)
+                                    else SoftBlue
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected || isFinalizat)
+                                    Icons.Default.CheckCircle
+                                else
+                                    Icons.Default.Medication,
+                                contentDescription = null,
+                                tint = if (isFinalizat) SuccessGreen else PrimaryBlue
                             )
                         }
 
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = Color(0xFF1976D2)
+                        Spacer(modifier = Modifier.width(14.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = livrare.numePacient,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = DarkBlue
                             )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = livrare.pat,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+
+                            Text(
+                                text = "💊 ${livrare.medicament}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF455A64)
+                            )
+
+                            if (isFinalizat) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Status: Livrat",
+                                    color = SuccessGreen,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }

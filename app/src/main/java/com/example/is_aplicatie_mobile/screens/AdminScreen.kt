@@ -22,8 +22,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminDashboard(onLogout: () -> Unit,
-                   onNavigateToReports: () -> Unit) {
+fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
     val context = LocalContext.current
     var isConnected by remember { mutableStateOf(false) }
     var controlMode by remember { mutableStateOf("La distanță") }
@@ -100,11 +99,10 @@ fun AdminDashboard(onLogout: () -> Unit,
                 isActive = isConnected,
                 onClick = {
                     if (!isConnected) {
-                        // Dacă robotul NU e conectat, arătăm alerta
                         alertMessage = "Robot neconectat!"
                         showSimpleAlert = true
                     } else {
-                        // Dacă robotul ESTE conectat, schimbăm pagina
+                        // Această funcție va schimba ecranul în MainApp
                         onNavigateToReports()
                     }
                 }
@@ -154,7 +152,6 @@ fun AdminDashboard(onLogout: () -> Unit,
                     if(!isConnected) { alertMessage = "Robot neconectat!"; showSimpleAlert = true }
                 }
             )
-
         }
     }
 

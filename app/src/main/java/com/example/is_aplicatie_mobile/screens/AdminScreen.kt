@@ -19,13 +19,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+// IMPORTURILE NOI
+import com.example.is_aplicatie_mobile.viewmodel.ModControl
+import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
+fun AdminDashboard(
+    onLogout: () -> Unit,
+    onNavigateToReports: () -> Unit,
+    // AM ADĂUGAT PARAMETRII NOI PENTRU NAVIGARE ȘI VIEWMODEL
+    viewModel: OperatorViewModel,
+    onNavigateToSchimbareMod: () -> Unit,
+    onNavigateToTeleghidare: () -> Unit
+) {
     val context = LocalContext.current
     var isConnected by remember { mutableStateOf(false) }
-    var controlMode by remember { mutableStateOf("La distanță") }
+
+    // CITIM MODUL DIRECT DIN VIEWMODEL ÎN LOC SĂ FIE VARIABILĂ LOCALĂ
+    val modCurent by viewModel.modCurent.collectAsState()
+    val controlModeText = if (modCurent == ModControl.AUTOMAT) "La distanță" else "Teleghidat"
 
     var alertMessage by remember { mutableStateOf("") }
     var showSimpleAlert by remember { mutableStateOf(false) }
@@ -60,9 +73,8 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            // Afișăm modul curent pentru claritate
             Text(
-                text = "Mod curent: $controlMode",
+                text = "Mod curent: $controlModeText",
                 fontSize = 14.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -70,7 +82,6 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 1. Conectare Robot - Activ mereu
             RobotMenuButton(
                 text = "Conectare Robot",
                 icon = Icons.Default.Bluetooth,
@@ -82,7 +93,6 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
                 }
             )
 
-            // 2. Comenzi din Cloud - Activ dacă e conectat
             RobotMenuButton(
                 text = "Comenzi din Cloud",
                 icon = Icons.Default.Cloud,
@@ -92,7 +102,6 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
                 }
             )
 
-            // 3. Trimitere rapoarte - Activ dacă e conectat
             RobotMenuButton(
                 text = "Trimitere rapoarte despre transportul curent",
                 icon = Icons.Default.Description,
@@ -102,13 +111,12 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
                         alertMessage = "Robot neconectat!"
                         showSimpleAlert = true
                     } else {
-                        // Această funcție va schimba ecranul în MainApp
                         onNavigateToReports()
                     }
                 }
             )
 
-            // 4. Schimbare Mod - Activ dacă e conectat
+            // MODIFICAT AICI: Deschide ecranul de selectare a modului
             RobotMenuButton(
                 text = "Schimbare Mod",
                 icon = Icons.Default.SyncAlt,
@@ -117,32 +125,31 @@ fun AdminDashboard(onLogout: () -> Unit, onNavigateToReports: () -> Unit) {
                     if(!isConnected) {
                         alertMessage = "Robot neconectat!"; showSimpleAlert = true
                     } else {
-                        controlMode = if(controlMode == "La distanță") "Teleghidat" else "La distanță"
+                        onNavigateToSchimbareMod()
                     }
                 }
             )
 
-            // 5. Teleghidare - ACTIV DOAR DACĂ (Conectat ȘI Mod == Teleghidat)
-            val isTeleghidareActive = isConnected && controlMode == "Teleghidat"
+            val isTeleghidareActive = isConnected && modCurent == ModControl.TELEGHIDARE
 
+            // MODIFICAT AICI: Deschide ecranul de teleghidare cu Joystick
             RobotMenuButton(
                 text = "Teleghidare",
                 icon = Icons.Default.Gamepad,
-                isActive = isTeleghidareActive, // Aici am schimbat logica vizuală
+                isActive = isTeleghidareActive,
                 onClick = {
                     if (!isConnected) {
                         alertMessage = "Robot neconectat!"
                         showSimpleAlert = true
-                    } else if (controlMode != "Teleghidat") {
-                        alertMessage = "Trebuie ca modul de control sa fie schimbat in teleghidare"
+                    } else if (modCurent != ModControl.TELEGHIDARE) {
+                        alertMessage = "Disponibil doar în mod teleghidare"
                         showSimpleAlert = true
                     } else {
-                        // Acțiune pentru teleghidare activă
+                        onNavigateToTeleghidare()
                     }
                 }
             )
 
-            // 6. Avarii - Activ dacă e conectat
             RobotMenuButton(
                 text = "Avarii",
                 icon = Icons.Default.ReportProblem,
@@ -199,7 +206,7 @@ fun RobotMenuButton(
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = if (isActive) color else Color.LightGray.copy(alpha = 0.6f),
-            contentColor = if (isActive) Color.White else Color.Gray // Schimbăm și culoarea textului când e inactiv
+            contentColor = if (isActive) Color.White else Color.Gray
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
     ) {

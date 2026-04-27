@@ -22,6 +22,7 @@ import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModelFactory
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModelFactory
+import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel // <-- Import nou pentru ViewModel-ul de teleghidare
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
                 var userToken by remember { mutableStateOf("") }
                 var selectedSalonId by remember { mutableIntStateOf(-1) }
 
+
                 // Initializare API Service
                 val apiService = RetrofitClient.instance
 
@@ -46,6 +48,9 @@ class MainActivity : ComponentActivity() {
                 val nurseViewModel: NurseViewModel = viewModel(
                     factory = NurseViewModelFactory(apiService)
                 )
+
+                // Instanțiere OperatorViewModel pentru ecranele de control robot
+                val operatorViewModel: OperatorViewModel = viewModel()
 
                 Box(
                     modifier = Modifier
@@ -119,27 +124,53 @@ class MainActivity : ComponentActivity() {
                                         authViewModel.resetLoginState()
                                         currentScreen = "login"
                                     }
-                                    // Aici afișăm AdminDashboard (Control Robot)
+
+                                    // Aici am adăugat parametrii lipsă pentru logica de teleghidare
                                     AdminDashboard(
                                         onLogout = {
                                             authViewModel.resetLoginState()
                                             currentScreen = "login"
                                         },
                                         onNavigateToReports = {
-                                            nurseViewModel.loadTransportCurent(userToken) // ACEASTA aduce toți pacienții
+                                            nurseViewModel.loadTransportCurent(userToken)
                                             currentScreen = "admin_reports"
+                                        },
+                                        viewModel = operatorViewModel,
+                                        onNavigateToSchimbareMod = {
+                                            currentScreen = "mode_selection"
+                                        },
+                                        onNavigateToTeleghidare = {
+                                            currentScreen = "teleoperation"
                                         }
                                     )
                                 }
 
                                 "admin_reports" -> {
-                                    // Butonul "Back" de pe telefon te duce înapoi la meniul robotului
                                     BackHandler { currentScreen = "main_app" }
 
                                     ReportsScreen(
                                         viewModel = nurseViewModel,
                                         onBack = { currentScreen = "main_app" },
                                         token = userToken
+                                    )
+                                }
+
+                                // Am adăugat ecranele noi în fluxul de navigare
+                                "mode_selection" -> {
+                                    BackHandler { currentScreen = "main_app" }
+
+                                    ModeSelectionScreen(
+                                        viewModel = operatorViewModel,
+                                        onBack = { currentScreen = "main_app" }
+                                    )
+                                }
+
+                                "teleoperation" -> {
+                                    BackHandler { currentScreen = "main_app" }
+
+                                    TeleoperationScreen(
+                                        viewModel = operatorViewModel,
+                                        onBack = { currentScreen = "main_app" }
                                     )
                                 }
                             }

@@ -1,7 +1,5 @@
 package com.example.is_aplicatie_mobile.screens
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -14,12 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-// IMPORTURILE NOI
+import com.example.is_aplicatie_mobile.viewmodel.ConnectionState
 import com.example.is_aplicatie_mobile.viewmodel.ModControl
 import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel
 
@@ -28,23 +24,58 @@ import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel
 fun AdminDashboard(
     onLogout: () -> Unit,
     onNavigateToReports: () -> Unit,
-    // AM ADĂUGAT PARAMETRII NOI PENTRU NAVIGARE ȘI VIEWMODEL
+    onNavigateToCloudComenzi: () -> Unit,
     viewModel: OperatorViewModel,
     onNavigateToSchimbareMod: () -> Unit,
     onNavigateToTeleghidare: () -> Unit
 ) {
-    val context = LocalContext.current
-    var isConnected by remember { mutableStateOf(false) }
-
-    // CITIM MODUL DIRECT DIN VIEWMODEL ÎN LOC SĂ FIE VARIABILĂ LOCALĂ
+    val connectionState by viewModel.connectionState.collectAsState()
+    val isConnected = connectionState == ConnectionState.CONNECTED
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val modCurent by viewModel.modCurent.collectAsState()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { msg ->
+            val result = snackbarHostState.showSnackbar(
+                message = msg,
+                actionLabel = "Reîncearcă",
+                duration = SnackbarDuration.Long
+            )
+            viewModel.clearError()
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.conecteazaLaWebSocket()
+            }
+        }
+    }
+
+    val (statusText, statusColor) = when (connectionState) {
+        ConnectionState.DISCONNECTED -> "Neconectat" to Color(0xFFD32F2F)
+        ConnectionState.CONNECTING -> "Se conectează..." to Color(0xFF757575)
+        ConnectionState.CONNECTED -> "Conectat" to Color(0xFF2E7D32)
+        ConnectionState.ERROR -> "Eroare conexiune" to Color(0xFFB71C1C)
+    }
+
+    val connectButtonText = when (connectionState) {
+        ConnectionState.CONNECTING -> "Se conectează..."
+        ConnectionState.CONNECTED -> "Conectat ✓"
+        else -> "Conectare Robot"
+    }
+
+    val connectButtonEnabled = connectionState == ConnectionState.DISCONNECTED ||
+        connectionState == ConnectionState.ERROR
+
+    val connectDisabledColor = when (connectionState) {
+        ConnectionState.CONNECTED -> Color(0xFF2E7D32)
+        ConnectionState.CONNECTING -> Color.LightGray.copy(alpha = 0.7f)
+        else -> Color.LightGray.copy(alpha = 0.5f)
+    }
+
     val controlModeText = if (modCurent == ModControl.AUTOMAT) "La distanță" else "Teleghidat"
 
-    var alertMessage by remember { mutableStateOf("") }
-    var showSimpleAlert by remember { mutableStateOf(false) }
-    var showBluetoothDialog by remember { mutableStateOf(false) }
-
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Meniu comenzi robot", fontWeight = FontWeight.ExtraBold) },
@@ -65,13 +96,25 @@ fun AdminDashboard(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = if (isConnected) "Conectat" else "Neconectat",
-                color = if (isConnected) Color(0xFF2E7D32) else Color(0xFFD32F2F),
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(vertical = 8.dp)
-            )
+            ) {
+                Text(
+                    text = statusText,
+                    color = statusColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+                if (connectionState == ConnectionState.CONNECTING) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = Color(0xFF757575)
+                    )
+                }
+            }
 
             Text(
                 text = "Mod curent: $controlModeText",
@@ -83,71 +126,50 @@ fun AdminDashboard(
             Spacer(modifier = Modifier.height(16.dp))
 
             RobotMenuButton(
-                text = "Conectare Robot",
-                icon = Icons.Default.Bluetooth,
-                isActive = true,
-                color = if (isConnected) Color(0xFF4CAF50) else Color(0xFF1976D2),
-                onClick = {
-                    if (!isConnected) showBluetoothDialog = true
-                    else { alertMessage = "Robot conectat"; showSimpleAlert = true }
-                }
+                text = connectButtonText,
+                icon = Icons.Default.Wifi,
+                isActive = connectButtonEnabled,
+                color = if (connectionState == ConnectionState.CONNECTED) {
+                    Color(0xFF2E7D32)
+                } else {
+                    Color(0xFF1976D2)
+                },
+                disabledContainerColor = connectDisabledColor,
+                onClick = { viewModel.conecteazaLaWebSocket() }
             )
 
             RobotMenuButton(
                 text = "Comenzi din Cloud",
                 icon = Icons.Default.Cloud,
-                isActive = isConnected,
-                onClick = {
-                    if(!isConnected) { alertMessage = "Robot neconectat!"; showSimpleAlert = true }
-                }
+                isActive = true,
+                color = Color(0xFF1976D2),
+                onClick = onNavigateToCloudComenzi
             )
 
             RobotMenuButton(
                 text = "Trimitere rapoarte despre transportul curent",
                 icon = Icons.Default.Description,
-                isActive = isConnected,
-                onClick = {
-                    if (!isConnected) {
-                        alertMessage = "Robot neconectat!"
-                        showSimpleAlert = true
-                    } else {
-                        onNavigateToReports()
-                    }
-                }
+                isActive = true,
+                color = Color(0xFF1976D2),
+                onClick = onNavigateToReports
             )
 
-            // MODIFICAT AICI: Deschide ecranul de selectare a modului
             RobotMenuButton(
                 text = "Schimbare Mod",
                 icon = Icons.Default.SyncAlt,
                 isActive = isConnected,
-                onClick = {
-                    if(!isConnected) {
-                        alertMessage = "Robot neconectat!"; showSimpleAlert = true
-                    } else {
-                        onNavigateToSchimbareMod()
-                    }
-                }
+                color = Color(0xFF1976D2),
+                onClick = onNavigateToSchimbareMod
             )
 
             val isTeleghidareActive = isConnected && modCurent == ModControl.TELEGHIDARE
 
-            // MODIFICAT AICI: Deschide ecranul de teleghidare cu Joystick
             RobotMenuButton(
                 text = "Teleghidare",
                 icon = Icons.Default.Gamepad,
                 isActive = isTeleghidareActive,
-                onClick = {
-                    if (!isConnected) {
-                        alertMessage = "Robot neconectat!"
-                        showSimpleAlert = true
-                    } else if (modCurent != ModControl.TELEGHIDARE) {
-                        alertMessage = "Disponibil doar în mod teleghidare"
-                        showSimpleAlert = true
-                    } else {
-                        onNavigateToTeleghidare()
-                    }
-                }
+                color = Color(0xFF1976D2),
+                onClick = onNavigateToTeleghidare
             )
 
             RobotMenuButton(
@@ -155,37 +177,9 @@ fun AdminDashboard(
                 icon = Icons.Default.ReportProblem,
                 isActive = isConnected,
                 color = Color(0xFFC62828),
-                onClick = {
-                    if(!isConnected) { alertMessage = "Robot neconectat!"; showSimpleAlert = true }
-                }
+                onClick = { /* logica avarii */ }
             )
         }
-    }
-
-    if (showSimpleAlert) {
-        AlertDialog(
-            onDismissRequest = { showSimpleAlert = false },
-            confirmButton = { TextButton(onClick = { showSimpleAlert = false }) { Text("OK") } },
-            text = { Text(alertMessage, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()) }
-        )
-    }
-
-    if (showBluetoothDialog) {
-        AlertDialog(
-            onDismissRequest = { showBluetoothDialog = false },
-            title = { Text("Bluetooth dezactivat", fontWeight = FontWeight.Bold) },
-            text = { Text("Va rugam activati/deschideti bluetooth") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        context.startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS))
-                        showBluetoothDialog = false
-                        isConnected = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1976D2))
-                ) { Text("Open Bluetooth") }
-            }
-        )
     }
 }
 
@@ -194,19 +188,23 @@ fun RobotMenuButton(
     text: String,
     icon: ImageVector,
     isActive: Boolean,
-    color: Color = Color(0xFF1976D2),
+    color: Color,
+    disabledContainerColor: Color = Color.LightGray.copy(alpha = 0.5f),
     onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
+        enabled = isActive,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .height(60.dp),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
-            containerColor = if (isActive) color else Color.LightGray.copy(alpha = 0.6f),
-            contentColor = if (isActive) Color.White else Color.Gray
+            containerColor = color,
+            disabledContainerColor = disabledContainerColor,
+            contentColor = Color.White,
+            disabledContentColor = Color.Gray.copy(alpha = 0.8f)
         ),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
     ) {
@@ -216,12 +214,7 @@ fun RobotMenuButton(
         ) {
             Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(16.dp))
-            Text(
-                text = text,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Start
-            )
+            Text(text = text, fontSize = 15.sp, fontWeight = FontWeight.Medium)
         }
     }
 }

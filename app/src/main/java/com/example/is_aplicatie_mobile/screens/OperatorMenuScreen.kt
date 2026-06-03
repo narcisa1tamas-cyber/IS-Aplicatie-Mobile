@@ -35,11 +35,11 @@ fun OperatorMenuScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Button(onClick = { /* TODO: Logica de conectare robot */ }, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-            Text("Conectare robot") // [cite: 87]
+            Text("Conectare robot")
         }
 
         Button(onClick = onNavigateToSchimbareMod, modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-            Text("Schimbare Mod") // [cite: 89]
+            Text("Schimbare Mod")
         }
 
         Button(
@@ -53,7 +53,7 @@ fun OperatorMenuScreen(
             modifier = Modifier.fillMaxWidth().padding(8.dp),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
         ) {
-            Text("Teleghidare") // [cite: 89]
+            Text("Teleghidare")
         }
     }
 }

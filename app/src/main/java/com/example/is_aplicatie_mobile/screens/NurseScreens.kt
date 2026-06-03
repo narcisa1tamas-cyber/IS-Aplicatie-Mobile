@@ -15,10 +15,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Medication
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,13 +42,15 @@ private val SoftBorder = Color(0xFFE0EAF5)
 @Composable
 fun NurseDashboard(
     viewModel: NurseViewModel,
+    token: String,
     onSalonSelected: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
-    val saloaneRaw by viewModel.saloane.collectAsState()
+    val saloaneOverview by viewModel.saloaneOverview.collectAsState()
+    val isLoadingSaloane by viewModel.isLoadingSaloane.collectAsState()
 
-    val saloaneVizibile = remember(saloaneRaw) {
-        saloaneRaw.distinctBy { it.nrSalon }
+    LaunchedEffect(token) {
+        viewModel.refreshSaloane(token)
     }
 
     Scaffold(
@@ -96,6 +100,25 @@ fun NurseDashboard(
                     Spacer(modifier = Modifier.weight(1f))
 
                     IconButton(
+                        onClick = { viewModel.refreshSaloane(token) },
+                        enabled = !isLoadingSaloane
+                    ) {
+                        if (isLoadingSaloane) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = PrimaryBlue
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Reîmprospătează saloanele",
+                                tint = PrimaryBlue
+                            )
+                        }
+                    }
+
+                    IconButton(
                         onClick = onLogout,
                         modifier = Modifier
                             .clip(CircleShape)
@@ -121,7 +144,7 @@ fun NurseDashboard(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(saloaneVizibile) { salon ->
+            items(saloaneOverview) { salon ->
                 Card(
                     modifier = Modifier
                         .padding(4.dp)
@@ -166,9 +189,10 @@ fun NurseDashboard(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = "Vezi comenzi",
+                            text = "${salon.paturiOcupate}/${salon.numarPaturi} paturi ocupate",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -184,12 +208,18 @@ fun WardDetailScreen(
     viewModel: NurseViewModel,
     onBack: () -> Unit
 ) {
-    val livrari by viewModel.detaliiLivrare.collectAsState()
+    val detaliiSalon by viewModel.detaliiSalon.collectAsState()
+    val salonCurent by viewModel.salonCurent.collectAsState()
+    val isLoadingSalon by viewModel.isLoadingSalon.collectAsState()
+    val paturiOcupate by viewModel.paturiOcupateSalonCurent.collectAsState()
     var pacientiSelectati by remember { mutableStateOf(setOf<String>()) }
     var showSuccessMessage by remember { mutableStateOf(false) }
 
-    LaunchedEffect(salonId) {
+    val livrari = if (salonCurent == salonId) detaliiSalon else emptyList()
+
+    LaunchedEffect(salonId, token) {
         pacientiSelectati = emptySet()
+        viewModel.loadPacientiPentruSalon(salonId, token)
     }
 
     if (showSuccessMessage) {
@@ -261,12 +291,38 @@ fun WardDetailScreen(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    Text(
-                        text = "Salon $salonId",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = DarkBlue
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Salon $salonId",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = DarkBlue
+                        )
+                        Text(
+                            text = "${livrari.count { !it.status.contains("ASTEPTARE", ignoreCase = true) && !it.status.equals("FINALIZAT", ignoreCase = true) }} comenzi active · $paturiOcupate paturi ocupate",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { viewModel.loadPacientiPentruSalon(salonId, token) },
+                        enabled = !isLoadingSalon
+                    ) {
+                        if (isLoadingSalon) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.dp,
+                                color = PrimaryBlue
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Reîmprospătează lista",
+                                tint = PrimaryBlue
+                            )
+                        }
+                    }
                 }
             }
         },
@@ -277,7 +333,7 @@ fun WardDetailScreen(
             ) {
                 Button(
                     onClick = {
-                        viewModel.confirmaFinalizarePreluare(token, pacientiSelectati)
+                        viewModel.confirmaFinalizarePreluare(token, salonId, pacientiSelectati)
                         showSuccessMessage = true
                     },
                     modifier = Modifier
@@ -297,6 +353,39 @@ fun WardDetailScreen(
         }
     ) { padding ->
 
+        if (isLoadingSalon && livrari.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = PrimaryBlue)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Se încarcă comenzile active...", color = Color.Gray)
+                }
+            }
+        } else if (livrari.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (paturiOcupate > 0) {
+                        "Există $paturiOcupate paturi ocupate, dar nu s-au găsit comenzi active în API.\n" +
+                            "Apasă Refresh sau verifică backend-ul (lazy loading / filtru salon)."
+                    } else {
+                        "Nu există comenzi active în acest salon."
+                    },
+                    color = Color.Gray,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+            }
+        } else {
         LazyColumn(
             modifier = Modifier
                 .padding(padding)
@@ -304,28 +393,35 @@ fun WardDetailScreen(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(livrari) { livrare ->
+            items(livrari.filter { !it.status.equals("FINALIZAT", ignoreCase = true) }, key = { it.id }) { livrare ->
 
-                val isSelected = pacientiSelectati.contains(livrare.numePacient)
-                val isFinalizat = livrare.status == "FINALIZAT"
+                val isFinalizat = livrare.status.equals("FINALIZAT", ignoreCase = true)
+                val isInAsteptare = livrare.status.contains("ASTEPTARE", ignoreCase = true)
+                val isActiv = !isFinalizat && !isInAsteptare
+                val isSelected = isActiv && pacientiSelectati.contains(livrare.id)
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
                         .border(
                             width = 2.dp,
-                            color = if (isSelected) PrimaryBlue else SoftBorder,
+                            color = when {
+                                isSelected -> PrimaryBlue
+                                isInAsteptare -> Color(0xFFFF8F00)
+                                else -> SoftBorder
+                            },
                             shape = RoundedCornerShape(24.dp)
                         )
-                        .clickable(enabled = !isFinalizat) {
+                        .clickable(enabled = isActiv) {
                             pacientiSelectati =
-                                if (isSelected) pacientiSelectati - livrare.numePacient
-                                else pacientiSelectati + livrare.numePacient
+                                if (isSelected) pacientiSelectati - livrare.id
+                                else pacientiSelectati + livrare.id
                         },
                     shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = when {
                             isFinalizat -> Color(0xFFE8F5E9)
+                            isInAsteptare -> Color(0xFFFFF8E1)
                             isSelected -> SoftBlue
                             else -> Color.White
                         }
@@ -343,18 +439,26 @@ fun WardDetailScreen(
                                 .size(50.dp)
                                 .clip(CircleShape)
                                 .background(
-                                    if (isSelected || isFinalizat) Color(0xFFC8E6C9)
-                                    else SoftBlue
+                                    when {
+                                        isSelected || isFinalizat -> Color(0xFFC8E6C9)
+                                        isInAsteptare -> Color(0xFFFFE0B2)
+                                        else -> SoftBlue
+                                    }
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = if (isSelected || isFinalizat)
-                                    Icons.Default.CheckCircle
-                                else
-                                    Icons.Default.Medication,
+                                imageVector = when {
+                                    isSelected || isFinalizat -> Icons.Default.CheckCircle
+                                    isInAsteptare -> Icons.Default.HourglassEmpty
+                                    else -> Icons.Default.Medication
+                                },
                                 contentDescription = null,
-                                tint = if (isFinalizat) SuccessGreen else PrimaryBlue
+                                tint = when {
+                                    isFinalizat -> SuccessGreen
+                                    isInAsteptare -> Color(0xFFE65100)
+                                    else -> PrimaryBlue
+                                }
                             )
                         }
 
@@ -382,11 +486,18 @@ fun WardDetailScreen(
                                 color = Color(0xFF455A64)
                             )
 
-                            if (isFinalizat) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "Status: Livrat",
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            when {
+                                isFinalizat -> Text(
+                                    text = "✅ Livrat",
                                     color = SuccessGreen,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                isInAsteptare -> Text(
+                                    text = "⏳ În așteptare",
+                                    color = Color(0xFFE65100),
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -395,6 +506,7 @@ fun WardDetailScreen(
                     }
                 }
             }
+        }
         }
     }
 }

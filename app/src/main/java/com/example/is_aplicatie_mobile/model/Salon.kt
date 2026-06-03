@@ -9,5 +9,7 @@ data class Salon(
     @SerializedName("nrSalon")
     val nrSalon: Int,
 
-    val ocupat: Boolean
+    val ocupat: Boolean = false,
+
+    val cnpPacient: String?
 )

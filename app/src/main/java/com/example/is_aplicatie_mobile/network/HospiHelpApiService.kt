@@ -22,7 +22,6 @@ interface HospiHelpApiService {
         @Header("Authorization") token: String
     ): Response<List<Salon>>
 
-    // Aici trimitem nrSalon, nu idPat
     @GET("api/comenzi/salon/{nrSalon}/active")
     suspend fun getComenziBySalon(
         @Header("Authorization") token: String,
@@ -36,13 +35,23 @@ interface HospiHelpApiService {
         @Body body: Map<String, String>
     ): Response<Comanda>
 
-    @GET("api/comenzi/status/ACTIV") // Sau adresa exactă pe care ai pus-o în Controller
+    @GET("api/comenzi/status/ACTIV")
     suspend fun getToateComenzileActive(
         @Header("Authorization") token: String
     ): Response<List<Comanda>>
 
-    @GET("api/comenzi/transport-curent") // FĂRĂ salon în coadă!
+    @GET("api/comenzi/status/IN_ASTEPTARE")
+    suspend fun getComenzileInAsteptare(
+        @Header("Authorization") token: String
+    ): Response<List<Comanda>>
+
+    @GET("api/comenzi/transport-curent")
     suspend fun getTransportCurent(
+        @Header("Authorization") token: String
+    ): Response<List<Comanda>>
+
+    @GET("api/comenzi")
+    suspend fun getToateComenzile(
         @Header("Authorization") token: String
     ): Response<List<Comanda>>
 }

@@ -1,16 +1,28 @@
 package com.example.is_aplicatie_mobile.network
 
+import android.util.Log
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
-    // ÎNLOCUIEȘTE CU IP-UL SAU URL-UL BACKEND-ULUI TĂU
-    // Dacă rulezi pe emulator, folosește IP-ul calculatorului tău http://192.168.1.101:8081/ sau "http://10.0.2.2:8080/" pentru localhost
-    private const val BASE_URL = "http://192.168.1.131:8081/"
+    private const val BASE_URL = "https://hospihelp-production.up.railway.app"
 
     val instance: HospiHelpApiService by lazy {
+        val logging = HttpLoggingInterceptor { message ->
+            Log.d("API_RAW", message)
+        }.apply {
+            level = HttpLoggingInterceptor.Level.BODY
+        }
+
+        val okHttpClient = OkHttpClient.Builder()
+            .addInterceptor(logging)
+            .build()
+
         val retrofit = Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 

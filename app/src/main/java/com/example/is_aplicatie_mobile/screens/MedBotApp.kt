@@ -21,6 +21,7 @@ fun ControlScreen(operatorViewModel: OperatorViewModel = viewModel()) {
             AdminDashboard(
                 viewModel = operatorViewModel,
                 onLogout = { /* Logica ta de logout */ },
+                onNavigateToCloudComenzi = { /* Logica comenzi cloud */ },
                 onNavigateToReports = { /* Logica ta de rapoarte */ },
                 onNavigateToSchimbareMod = {
                     currentRoute = ControlRoute.MODE_SELECTION

@@ -22,7 +22,7 @@ import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModelFactory
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModelFactory
-import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel // <-- Import nou pentru ViewModel-ul de teleghidare
+import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,8 +37,7 @@ class MainActivity : ComponentActivity() {
                 var userToken by remember { mutableStateOf("") }
                 var selectedSalonId by remember { mutableIntStateOf(-1) }
 
-
-                // Initializare API Service
+                // Inițializare API Service
                 val apiService = RetrofitClient.instance
 
                 val authViewModel: AuthViewModel = viewModel(
@@ -49,7 +48,7 @@ class MainActivity : ComponentActivity() {
                     factory = NurseViewModelFactory(apiService)
                 )
 
-                // Instanțiere OperatorViewModel pentru ecranele de control robot
+                // Instanțiere OperatorViewModel (Unic pe sesiune - ține minte conexiunea!)
                 val operatorViewModel: OperatorViewModel = viewModel()
 
                 Box(
@@ -78,11 +77,10 @@ class MainActivity : ComponentActivity() {
                                             userRole = user.rol
                                             userToken = user.token
 
-                                            if (userRole == "ASISTENTA") {
+                                            if (userRole.uppercase() == "ASISTENTA") {
                                                 nurseViewModel.loadSaloaneDinCloud(userToken)
                                                 currentScreen = "nurse_dashboard"
                                             } else {
-                                                // Rol ADMIN / CONTROL ROBOT
                                                 currentScreen = "main_app"
                                             }
                                         },
@@ -97,9 +95,9 @@ class MainActivity : ComponentActivity() {
                                     }
                                     NurseDashboard(
                                         viewModel = nurseViewModel,
+                                        token = userToken,
                                         onSalonSelected = { id ->
                                             selectedSalonId = id
-                                            nurseViewModel.loadPacientiPentruSalon(id, userToken)
                                             currentScreen = "ward_details"
                                         },
                                         onLogout = {
@@ -110,32 +108,51 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 "ward_details" -> {
-                                    BackHandler { currentScreen = "nurse_dashboard" }
+                                    BackHandler {
+                                        nurseViewModel.clearSalonDetail()
+                                        nurseViewModel.refreshSaloane(userToken)
+                                        currentScreen = "nurse_dashboard"
+                                    }
                                     WardDetailScreen(
                                         salonId = selectedSalonId,
                                         token = userToken,
                                         viewModel = nurseViewModel,
-                                        onBack = { currentScreen = "nurse_dashboard" }
+                                        onBack = {
+                                            nurseViewModel.clearSalonDetail()
+                                            nurseViewModel.refreshSaloane(userToken)
+                                            currentScreen = "nurse_dashboard"
+                                        }
                                     )
                                 }
 
                                 "main_app" -> {
+                                    // REPARAT: Când apeși înapoi în meniul principal, te deloghează fără să distrugă
+                                    // conexiunea dacă te-ai întors din greșeală dintr-un sub-ecran sau setări
                                     BackHandler {
                                         authViewModel.resetLoginState()
                                         currentScreen = "login"
                                     }
 
-                                    // Aici am adăugat parametrii lipsă pentru logica de teleghidare
+                                    // Încearcă conectarea automată silențioasă prin WebSocket la pornire
+                                    LaunchedEffect(Unit) {
+                                        operatorViewModel.conecteazaLaDispozitivDisponibil()
+                                    }
+
                                     AdminDashboard(
+                                        viewModel = operatorViewModel,
                                         onLogout = {
+                                            operatorViewModel.inchideConexiune()
                                             authViewModel.resetLoginState()
                                             currentScreen = "login"
+                                        },
+                                        onNavigateToCloudComenzi = {
+                                            nurseViewModel.loadToateComenzileCloud(userToken)
+                                            currentScreen = "cloud_comenzi"
                                         },
                                         onNavigateToReports = {
                                             nurseViewModel.loadTransportCurent(userToken)
                                             currentScreen = "admin_reports"
                                         },
-                                        viewModel = operatorViewModel,
                                         onNavigateToSchimbareMod = {
                                             currentScreen = "mode_selection"
                                         },
@@ -145,9 +162,17 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
+                                "cloud_comenzi" -> {
+                                    BackHandler { currentScreen = "main_app" }
+                                    CloudComenziScreen(
+                                        viewModel = nurseViewModel,
+                                        onBack = { currentScreen = "main_app" },
+                                        token = userToken
+                                    )
+                                }
+
                                 "admin_reports" -> {
                                     BackHandler { currentScreen = "main_app" }
-
                                     ReportsScreen(
                                         viewModel = nurseViewModel,
                                         onBack = { currentScreen = "main_app" },
@@ -155,10 +180,8 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
 
-                                // Am adăugat ecranele noi în fluxul de navigare
                                 "mode_selection" -> {
                                     BackHandler { currentScreen = "main_app" }
-
                                     ModeSelectionScreen(
                                         viewModel = operatorViewModel,
                                         onBack = { currentScreen = "main_app" }
@@ -167,7 +190,6 @@ class MainActivity : ComponentActivity() {
 
                                 "teleoperation" -> {
                                     BackHandler { currentScreen = "main_app" }
-
                                     TeleoperationScreen(
                                         viewModel = operatorViewModel,
                                         onBack = { currentScreen = "main_app" }

@@ -27,7 +27,8 @@ fun AdminDashboard(
     onNavigateToCloudComenzi: () -> Unit,
     viewModel: OperatorViewModel,
     onNavigateToSchimbareMod: () -> Unit,
-    onNavigateToTeleghidare: () -> Unit
+    onNavigateToTeleghidare: () -> Unit,
+    onNavigateToAvarii: () -> Unit
 ) {
     val connectionState by viewModel.connectionState.collectAsState()
     val isConnected = connectionState == ConnectionState.CONNECTED
@@ -175,9 +176,9 @@ fun AdminDashboard(
             RobotMenuButton(
                 text = "Avarii",
                 icon = Icons.Default.ReportProblem,
-                isActive = isConnected,
+                isActive = true,
                 color = Color(0xFFC62828),
-                onClick = { /* logica avarii */ }
+                onClick = onNavigateToAvarii
             )
         }
     }

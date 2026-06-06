@@ -6,6 +6,8 @@ data class Comanda(
     val idComanda: Int,
     @SerializedName("status")
     val status: String,
+    @SerializedName("confirmat_asistenta")
+    val confirmatAsistenta: Boolean = false,
     @SerializedName("pat")
     val pat: PatObiect?,
     @SerializedName("prescriptie")

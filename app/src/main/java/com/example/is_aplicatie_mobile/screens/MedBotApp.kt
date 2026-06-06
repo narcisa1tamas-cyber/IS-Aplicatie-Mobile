@@ -28,7 +28,8 @@ fun ControlScreen(operatorViewModel: OperatorViewModel = viewModel()) {
                 },
                 onNavigateToTeleghidare = {
                     currentRoute = ControlRoute.TELEOPERATION
-                }
+                },
+                onNavigateToAvarii = { /* Logica avarii */ }
             )
         }
         ControlRoute.MODE_SELECTION -> {
@@ -37,6 +38,7 @@ fun ControlScreen(operatorViewModel: OperatorViewModel = viewModel()) {
                 onBack = { currentRoute = ControlRoute.MENU }
             )
         }
+        // token și numeOperator nu sunt disponibile aici — se folosesc valorile default
         ControlRoute.TELEOPERATION -> {
             TeleoperationScreen(
                 viewModel = operatorViewModel,

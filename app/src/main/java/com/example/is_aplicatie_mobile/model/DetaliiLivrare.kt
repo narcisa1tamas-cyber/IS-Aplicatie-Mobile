@@ -8,5 +8,6 @@ data class DetaliiLivrare(
     val numePacient: String,
     val pat: String,
     val medicament: String,
-    val status: String
+    val status: String,
+    val confirmatAsistenta: Boolean = false
 )

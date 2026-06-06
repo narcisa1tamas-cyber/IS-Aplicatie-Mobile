@@ -48,9 +48,26 @@ fun NurseDashboard(
 ) {
     val saloaneOverview by viewModel.saloaneOverview.collectAsState()
     val isLoadingSaloane by viewModel.isLoadingSaloane.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     LaunchedEffect(token) {
         viewModel.refreshSaloane(token)
+    }
+
+    errorMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("OK", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            title = {
+                Text("Eroare", fontWeight = FontWeight.ExtraBold, color = DarkBlue)
+            },
+            text = { Text(msg, color = Color.Gray) },
+            shape = RoundedCornerShape(20.dp)
+        )
     }
 
     Scaffold(
@@ -186,14 +203,6 @@ fun NurseDashboard(
                             color = DarkBlue
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Text(
-                            text = "${salon.paturiOcupate}/${salon.numarPaturi} paturi ocupate",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.Gray,
-                            textAlign = TextAlign.Center
-                        )
                     }
                 }
             }
@@ -212,10 +221,28 @@ fun WardDetailScreen(
     val salonCurent by viewModel.salonCurent.collectAsState()
     val isLoadingSalon by viewModel.isLoadingSalon.collectAsState()
     val paturiOcupate by viewModel.paturiOcupateSalonCurent.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     var pacientiSelectati by remember { mutableStateOf(setOf<String>()) }
     var showSuccessMessage by remember { mutableStateOf(false) }
 
-    val livrari = if (salonCurent == salonId) detaliiSalon else emptyList()
+    errorMessage?.let { msg ->
+        AlertDialog(
+            onDismissRequest = { viewModel.clearError() },
+            confirmButton = {
+                TextButton(onClick = { viewModel.clearError() }) {
+                    Text("OK", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            title = {
+                Text("Eroare", fontWeight = FontWeight.ExtraBold, color = DarkBlue)
+            },
+            text = { Text(msg, color = Color.Gray) },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    // Aici a fost modificarea cheie: se citesc direct datele din viewModel, fără verificarea salonCurent
+    val livrari = detaliiSalon
 
     LaunchedEffect(salonId, token) {
         pacientiSelectati = emptySet()
@@ -299,7 +326,7 @@ fun WardDetailScreen(
                             color = DarkBlue
                         )
                         Text(
-                            text = "${livrari.count { !it.status.contains("ASTEPTARE", ignoreCase = true) && !it.status.equals("FINALIZAT", ignoreCase = true) }} comenzi active · $paturiOcupate paturi ocupate",
+                            text = "${livrari.count { !it.status.contains("ASTEPTARE", ignoreCase = true) && !it.status.equals("FINALIZAT", ignoreCase = true) }} comenzi active",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.Gray
                         )
@@ -333,7 +360,7 @@ fun WardDetailScreen(
             ) {
                 Button(
                     onClick = {
-                        viewModel.confirmaFinalizarePreluare(token, salonId, pacientiSelectati)
+                        viewModel.confirmaPreluareaComenzii(token, salonId, pacientiSelectati)
                         showSuccessMessage = true
                     },
                     modifier = Modifier
@@ -374,139 +401,143 @@ fun WardDetailScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = if (paturiOcupate > 0) {
-                        "Există $paturiOcupate paturi ocupate, dar nu s-au găsit comenzi active în API.\n" +
-                            "Apasă Refresh sau verifică backend-ul (lazy loading / filtru salon)."
-                    } else {
-                        "Nu există comenzi active în acest salon."
-                    },
+                    text = "Nu există comenzi active în acest salon.",
                     color = Color.Gray,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
             }
         } else {
-        LazyColumn(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(livrari.filter { !it.status.equals("FINALIZAT", ignoreCase = true) }, key = { it.id }) { livrare ->
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(livrari.filter { !it.status.equals("FINALIZAT", ignoreCase = true) }, key = { it.id }) { livrare ->
 
-                val isFinalizat = livrare.status.equals("FINALIZAT", ignoreCase = true)
-                val isInAsteptare = livrare.status.contains("ASTEPTARE", ignoreCase = true)
-                val isActiv = !isFinalizat && !isInAsteptare
-                val isSelected = isActiv && pacientiSelectati.contains(livrare.id)
+                    val isFinalizat = livrare.status.equals("FINALIZAT", ignoreCase = true)
+                    val isInAsteptare = livrare.status.contains("ASTEPTARE", ignoreCase = true)
+                    val isConfirmat = livrare.confirmatAsistenta
+                    val isActiv = !isFinalizat && !isInAsteptare
+                    val isSelected = isActiv && pacientiSelectati.contains(livrare.id)
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 2.dp,
-                            color = when {
-                                isSelected -> PrimaryBlue
-                                isInAsteptare -> Color(0xFFFF8F00)
-                                else -> SoftBorder
-                            },
-                            shape = RoundedCornerShape(24.dp)
-                        )
-                        .clickable(enabled = isActiv) {
-                            pacientiSelectati =
-                                if (isSelected) pacientiSelectati - livrare.id
-                                else pacientiSelectati + livrare.id
-                        },
-                    shape = RoundedCornerShape(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = when {
-                            isFinalizat -> Color(0xFFE8F5E9)
-                            isInAsteptare -> Color(0xFFFFF8E1)
-                            isSelected -> SoftBlue
-                            else -> Color.White
-                        }
-                    ),
-                    elevation = CardDefaults.cardElevation(4.dp)
-                ) {
-                    Row(
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(50.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    when {
-                                        isSelected || isFinalizat -> Color(0xFFC8E6C9)
-                                        isInAsteptare -> Color(0xFFFFE0B2)
-                                        else -> SoftBlue
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = when {
-                                    isSelected || isFinalizat -> Icons.Default.CheckCircle
-                                    isInAsteptare -> Icons.Default.HourglassEmpty
-                                    else -> Icons.Default.Medication
+                            .border(
+                                width = 2.dp,
+                                color = when {
+                                    isSelected -> PrimaryBlue
+                                    isConfirmat -> SuccessGreen
+                                    isInAsteptare -> Color(0xFFFF8F00)
+                                    else -> SoftBorder
                                 },
-                                contentDescription = null,
-                                tint = when {
-                                    isFinalizat -> SuccessGreen
-                                    isInAsteptare -> Color(0xFFE65100)
-                                    else -> PrimaryBlue
+                                shape = RoundedCornerShape(24.dp)
+                            )
+                            .clickable(enabled = isActiv && !isConfirmat) {
+                                pacientiSelectati =
+                                    if (isSelected) pacientiSelectati - livrare.id
+                                    else pacientiSelectati + livrare.id
+                            },
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = when {
+                                isFinalizat -> Color(0xFFE8F5E9)
+                                isConfirmat -> Color(0xFFE8F5E9)
+                                isInAsteptare -> Color(0xFFFFF8E1)
+                                isSelected -> SoftBlue
+                                else -> Color.White
+                            }
+                        ),
+                        elevation = CardDefaults.cardElevation(4.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(50.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        when {
+                                            isSelected || isFinalizat || isConfirmat -> Color(0xFFC8E6C9)
+                                            isInAsteptare -> Color(0xFFFFE0B2)
+                                            else -> SoftBlue
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = when {
+                                        isSelected || isFinalizat || isConfirmat -> Icons.Default.CheckCircle
+                                        isInAsteptare -> Icons.Default.HourglassEmpty
+                                        else -> Icons.Default.Medication
+                                    },
+                                    contentDescription = null,
+                                    tint = when {
+                                        isFinalizat || isConfirmat -> SuccessGreen
+                                        isInAsteptare -> Color(0xFFE65100)
+                                        else -> PrimaryBlue
+                                    }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = livrare.numePacient,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = DarkBlue
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = livrare.pat,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.Gray
+                                )
+
+                                Text(
+                                    text = "💊 ${livrare.medicament}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFF455A64)
+                                )
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                when {
+                                    isFinalizat -> Text(
+                                        text = "✅ Livrat",
+                                        color = SuccessGreen,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    isConfirmat -> Text(
+                                        text = "✅ Preluat de asistentă",
+                                        color = SuccessGreen,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    isInAsteptare -> Text(
+                                        text = "⏳ În așteptare",
+                                        color = Color(0xFFE65100),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(14.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = livrare.numePacient,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = DarkBlue
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            Text(
-                                text = livrare.pat,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
-                            )
-
-                            Text(
-                                text = "💊 ${livrare.medicament}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color(0xFF455A64)
-                            )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            when {
-                                isFinalizat -> Text(
-                                    text = "✅ Livrat",
-                                    color = SuccessGreen,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                isInAsteptare -> Text(
-                                    text = "⏳ În așteptare",
-                                    color = Color(0xFFE65100),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold
-                                )
                             }
                         }
                     }
                 }
             }
-        }
         }
     }
 }

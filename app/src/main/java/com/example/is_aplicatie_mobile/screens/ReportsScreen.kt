@@ -25,8 +25,11 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(viewModel: NurseViewModel, onBack: () -> Unit, token: String) {
-    // Colectăm starea livrărilor
-    val livrari by viewModel.detaliiTransport.collectAsState()
+    val toateLivrari by viewModel.detaliiTransport.collectAsState()
+    val livrari = toateLivrari.filter {
+        it.status.equals("ACTIV", ignoreCase = true) ||
+        it.status.equals("ACTIVE", ignoreCase = true)
+    }
 
     // MECANISM AUTO-REFRESH:
     // Interogăm serverul la fiecare 5 secunde.
@@ -165,9 +168,9 @@ fun CloudComenziScreen(viewModel: NurseViewModel, onBack: () -> Unit, token: Str
     val toateComenzile by viewModel.toateComenzileCloud.collectAsState()
     val isLoading by viewModel.isLoadingCloud.collectAsState()
 
-    var filtruSelectat by remember { mutableStateOf("TOATE") }
+    var filtruSelectat by remember { mutableStateOf("ACTIV") }
 
-    val filtre = listOf("TOATE", "ACTIV", "IN_ASTEPTARE", "FINALIZAT")
+    val filtre = listOf("ACTIV", "IN_ASTEPTARE", "FINALIZAT", "TOATE")
 
     val comenziFiltrate = when (filtruSelectat) {
         "TOATE" -> toateComenzile

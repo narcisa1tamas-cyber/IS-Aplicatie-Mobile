@@ -4,6 +4,9 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothSocket
 import android.util.Log
+import java.io.BufferedReader
+import java.io.InputStream
+import java.io.InputStreamReader
 import java.io.OutputStream
 import java.util.UUID
 
@@ -14,6 +17,7 @@ class RobotBluetoothManager {
 
     private var socket: BluetoothSocket? = null
     private var outputStream: OutputStream? = null
+    private var inputStream: InputStream? = null
 
     var lastError: String = ""
         private set
@@ -64,6 +68,7 @@ class RobotBluetoothManager {
             }
 
             outputStream = socket!!.outputStream
+            inputStream  = socket!!.inputStream
             Log.d("BT", "Conectat cu succes la ${device.name}")
             true
         } catch (e: Exception) {
@@ -82,9 +87,31 @@ class RobotBluetoothManager {
         }
     }
 
+    /**
+     * Citește mesaje JSON trimise de robot, linie cu linie.
+     * Apelează [onMesaj] pentru fiecare linie primită.
+     * Blocant — apelează dintr-o corutină IO.
+     */
+    fun citesteFlux(onMesaj: (String) -> Unit) {
+        val stream = inputStream ?: return
+        try {
+            val reader = BufferedReader(InputStreamReader(stream))
+            while (true) {
+                val linie = reader.readLine() ?: break
+                if (linie.isNotBlank()) {
+                    Log.d("BT-IN", "Primit de la robot: $linie")
+                    onMesaj(linie)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("BT-IN", "Citire flux oprită: ${e.message}")
+        }
+    }
+
     fun deconecteaza() {
         trimiteMesaj("{\"actiune\":\"release\",\"directie\":\"STOP\"}")
         try {
+            inputStream?.close()
             outputStream?.close()
             socket?.close()
         } catch (e: Exception) {

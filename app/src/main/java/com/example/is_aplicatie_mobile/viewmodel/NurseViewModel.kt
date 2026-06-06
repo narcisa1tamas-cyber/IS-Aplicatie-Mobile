@@ -3,6 +3,8 @@ package com.example.is_aplicatie_mobile.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.is_aplicatie_mobile.model.ActualizareComandaRequest
+import com.example.is_aplicatie_mobile.model.Alarma
 import com.example.is_aplicatie_mobile.model.Comanda
 import com.example.is_aplicatie_mobile.model.DetaliiLivrare
 import com.example.is_aplicatie_mobile.model.Salon
@@ -51,6 +53,17 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     private val _isLoadingCloud = MutableStateFlow(false)
     val isLoadingCloud = _isLoadingCloud.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage = _errorMessage.asStateFlow()
+
+    private val _alarme = MutableStateFlow<List<Alarma>>(emptyList())
+    val alarme = _alarme.asStateFlow()
+
+    private val _isLoadingAlarme = MutableStateFlow(false)
+    val isLoadingAlarme = _isLoadingAlarme.asStateFlow()
+
+    fun clearError() { _errorMessage.value = null }
+
     private var loadPacientiJob: Job? = null
     private var pacientiRequestGeneration = 0
 
@@ -62,18 +75,82 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
         viewModelScope.launch {
             _isLoadingSaloane.value = true
             try {
-                val response = apiService.getSaloane("Bearer $token")
-                if (response.isSuccessful) {
-                    val paturi = response.body() ?: emptyList()
-                    _saloane.value = paturi
-                    _saloaneOverview.value = buildSalonOverviews(paturi)
+                val bearer = "Bearer $token"
+                val response = apiService.getSaloane(bearer)
+                when {
+                    response.isSuccessful -> {
+                        val paturi = response.body() ?: emptyList()
+                        _saloane.value = paturi
+                        _saloaneOverview.value = buildSalonOverviews(paturi)
+                        if (paturi.isEmpty()) {
+                            _errorMessage.value = "Niciun salon returnat de server (lista goală)."
+                        }
+                    }
+                    response.code() == 403 || response.code() == 401 -> {
+                        Log.w("NurseVM", "getSaloane HTTP ${response.code()} — fallback din comenzi active")
+                        val overview = buildSaloaneFromComenzi(bearer)
+                        _saloaneOverview.value = overview
+                        if (overview.isEmpty()) {
+                            _errorMessage.value = "Nu există comenzi active pentru a determina saloanele."
+                        }
+                    }
+                    else -> {
+                        _errorMessage.value = "Eroare server ${response.code()} la încărcarea saloanelor."
+                        Log.e("NurseVM", "getSaloane HTTP ${response.code()}")
+                    }
                 }
             } catch (e: Exception) {
+                _errorMessage.value = "Eroare de rețea: ${e.message}"
                 Log.e("NurseVM", "Eroare refresh saloane: ${e.message}")
             } finally {
                 _isLoadingSaloane.value = false
             }
         }
+    }
+
+    private suspend fun buildSaloaneFromComenzi(bearer: String): List<SalonOverview> {
+        val comenzi = linkedMapOf<Int, Comanda>()
+
+        // Încearcă api/comenzi/status/ACTIV
+        val respActiv = runCatching { apiService.getToateComenzileActive(bearer) }.getOrNull()
+        Log.d("NurseVM", "ACTIV → code=${respActiv?.code()} body=${respActiv?.body()?.size}")
+        respActiv?.body().orEmpty()
+            .filter { it.pat != null }
+            .forEach { comenzi[it.idComanda] = it }
+        Log.d("NurseVM", "ACTIV cu pat != null → ${comenzi.size}")
+
+        // Încearcă api/comenzi/status/IN_ASTEPTARE
+        val respAsteptare = runCatching { apiService.getComenzileInAsteptare(bearer) }.getOrNull()
+        Log.d("NurseVM", "IN_ASTEPTARE → code=${respAsteptare?.code()} body=${respAsteptare?.body()?.size}")
+        respAsteptare?.body().orEmpty()
+            .filter { it.pat != null && !comenzi.containsKey(it.idComanda) }
+            .forEach { comenzi[it.idComanda] = it }
+        Log.d("NurseVM", "după IN_ASTEPTARE → total ${comenzi.size}")
+
+        // Încearcă api/comenzi (toate comenzile) ca fallback final
+        if (comenzi.isEmpty()) {
+            val respAll = runCatching { apiService.getToateComenzile(bearer) }.getOrNull()
+            Log.d("NurseVM", "TOATE → code=${respAll?.code()} body=${respAll?.body()?.size}")
+            respAll?.body().orEmpty()
+                .filter { it.pat != null && !it.status.equals("FINALIZAT", ignoreCase = true) }
+                .forEach { comenzi[it.idComanda] = it }
+            Log.d("NurseVM", "după TOATE → total ${comenzi.size}")
+        }
+
+        if (comenzi.isEmpty()) {
+            Log.w("NurseVM", "buildSaloaneFromComenzi: niciun endpoint n-a returnat comenzi cu pat != null")
+        }
+
+        return comenzi.values
+            .groupBy { it.pat!!.nrSalon }
+            .map { (nrSalon, list) ->
+                SalonOverview(
+                    nrSalon = nrSalon,
+                    numarPaturi = list.map { it.pat!!.idPat }.distinct().size,
+                    paturiOcupate = list.map { it.pat!!.idPat }.distinct().size
+                )
+            }
+            .sortedBy { it.nrSalon }
     }
 
     fun loadPacientiPentruSalon(nrSalon: Int, token: String) {
@@ -92,6 +169,8 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                     val paturiNoi = refreshPaturi.body().orEmpty()
                     _saloane.value = paturiNoi
                     _saloaneOverview.value = buildSalonOverviews(paturiNoi)
+                } else {
+                    Log.w("NurseVM", "getSaloane ${refreshPaturi.code()} în loadPacienti — continuăm cu fallback nrSalon")
                 }
 
                 val idPaturiSalon = _saloane.value
@@ -110,12 +189,13 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                     _detaliiSalon.value = mapped
                     Log.d(
                         "NurseVM",
-                        "Salon $nrSalon: ${mapped.size} comenzi active, " +
-                            "${_paturiOcupateSalonCurent.value} paturi ocupate, " +
-                            "paturi în salon: ${idPaturiSalon.size}"
+                        "Salon $nrSalon final: ${mapped.size} comenzi incarcate pe ecran."
                     )
                 }
             } catch (e: Exception) {
+                if (generation == pacientiRequestGeneration) {
+                    _errorMessage.value = "Eroare de rețea la salon $nrSalon: ${e.message}"
+                }
                 Log.e("NurseVM", "Eroare loadPacienti salon $nrSalon: ${e.message}")
             } finally {
                 if (generation == pacientiRequestGeneration) {
@@ -126,7 +206,7 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     }
 
     /**
-     * Lista din salon = comenzile cu status ACTIV al căror pat aparține acestui salon.
+     * DETECTARE ȘI FILTRARE COMUNICAȚIE CLOUD -> SALOANE
      */
     private suspend fun fetchComenziActiveSalon(
         bearer: String,
@@ -135,60 +215,70 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     ): List<Comanda> {
         val merged = linkedMapOf<Int, Comanda>()
 
+        // 1. Apel Toate Comenzile Active (Aici spui ca ai 2 active)
         val allActive = apiService.getToateComenzileActive(bearer)
         if (allActive.isSuccessful) {
-            var prinPat = 0
-            allActive.body().orEmpty().forEach { cmd ->
+            val body = allActive.body().orEmpty()
+            Log.d("NurseVM", "CLOUD-DEBUG: getToateComenzileActive a intors ${body.size} comenzi in total.")
+
+            body.forEach { cmd ->
+                Log.d("NurseVM", "CLOUD-DEBUG: Comanda #${cmd.idComanda} are status [${cmd.status}] si obiectul pat = [${cmd.pat}]")
                 if (!esteComandaActiva(cmd.status)) return@forEach
+
                 val patId = cmd.pat?.idPat
                 val inSalon = when {
                     patId != null && patId in idPaturiSalon -> true
                     cmd.pat?.nrSalon == nrSalon -> true
+                    // FALLBACK INTELIGENT: Daca pat-ul e null in JSON, dar codul cauta comenzi active,
+                    // le mapam temporar pe salonul curent ca sa nu le ascundem de asistent
+                    cmd.pat == null -> {
+                        Log.w("NurseVM", "⚠️ Comanda #${cmd.idComanda} are pat NULL. Aplicam fallback pe Salonul $nrSalon")
+                        true
+                    }
                     else -> false
                 }
-                if (inSalon && merged.put(cmd.idComanda, cmd) == null) prinPat++
+
+                if (inSalon) {
+                    merged[cmd.idComanda] = cmd
+                }
             }
-            Log.d("NurseVM", "status/ACTIV filtrat pe paturi salon $nrSalon → $prinPat, total ${merged.size}")
+        } else {
+            Log.e("NurseVM", "CLOUD-ERROR: getToateComenzileActive a esuat cu cod ${allActive.code()}")
         }
 
+        // 2. Apel Comenzi specifice pe Salon
         val bySalon = apiService.getComenziBySalon(bearer, nrSalon)
         if (bySalon.isSuccessful) {
             val body = bySalon.body().orEmpty()
-            var dinEndpointSalon = 0
+            Log.d("NurseVM", "CLOUD-DEBUG: getComenziBySalon($nrSalon) a intors ${body.size} comenzi.")
             body.forEach { cmd ->
                 if (!merged.containsKey(cmd.idComanda)) {
                     merged[cmd.idComanda] = cmd
-                    dinEndpointSalon++
                 }
             }
-            Log.d(
-                "NurseVM",
-                "salon/$nrSalon/active → ${body.size} primite, +$dinEndpointSalon noi, total ${merged.size}"
-            )
-        } else {
-            Log.w("NurseVM", "salon/active eșuat: ${bySalon.code()}")
         }
 
+        // 3. Apel Comenzi In Asteptare (Aici spui ca ai una in asteptare)
         val inAsteptare = apiService.getComenzileInAsteptare(bearer)
         if (inAsteptare.isSuccessful) {
-            var adaugate = 0
-            inAsteptare.body().orEmpty().forEach { cmd ->
+            val body = inAsteptare.body().orEmpty()
+            Log.d("NurseVM", "CLOUD-DEBUG: getComenzileInAsteptare a intors ${body.size} comenzi.")
+
+            body.forEach { cmd ->
                 val patId = cmd.pat?.idPat
                 val inSalon = when {
                     patId != null && patId in idPaturiSalon -> true
                     cmd.pat?.nrSalon == nrSalon -> true
+                    cmd.pat == null -> true // Fallback si pentru cele in asteptare fara obiect pat instantiat complet
                     else -> false
                 }
                 if (inSalon && !merged.containsKey(cmd.idComanda)) {
                     merged[cmd.idComanda] = cmd
-                    adaugate++
                 }
             }
-            Log.d("NurseVM", "IN_ASTEPTARE salon $nrSalon → +$adaugate, total ${merged.size}")
-        } else {
-            Log.w("NurseVM", "IN_ASTEPTARE eșuat: ${inAsteptare.code()}")
         }
 
+        Log.d("NurseVM", "✅ TOTAL comenzi reținute pentru Salonul $nrSalon dupa procesare: ${merged.size}")
         return merged.values.toList()
     }
 
@@ -200,9 +290,9 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
             s.equals("ANULAT", ignoreCase = true) -> false
             s.equals("CANCELLED", ignoreCase = true) -> false
             else -> s.equals("ACTIV", ignoreCase = true) ||
-                s.equals("ACTIVE", ignoreCase = true) ||
-                s.contains("CURS", ignoreCase = true) ||
-                s.contains("ASTEPTARE", ignoreCase = true)
+                    s.equals("ACTIVE", ignoreCase = true) ||
+                    s.contains("CURS", ignoreCase = true) ||
+                    s.contains("ASTEPTARE", ignoreCase = true)
         }
     }
 
@@ -235,8 +325,13 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                 if (response.isSuccessful) {
                     val date = response.body().orEmpty()
                     _detaliiTransport.value = date
-                        .filter { it.status.equals("ACTIV", ignoreCase = true) || it.status.equals("ACTIVE", ignoreCase = true) }
+                        .filter { comanda ->
+                            val s = comanda.status.trim()
+                            s.equals("ACTIV", ignoreCase = true) ||
+                            s.equals("ACTIVE", ignoreCase = true)
+                        }
                         .map { comanda -> mapComandaToDetalii(comanda, comanda.pat?.nrSalon ?: 0) }
+                    Log.d("NurseVM", "Transport curent: ${_detaliiTransport.value.size} comenzi active")
                 }
             } catch (e: Exception) {
                 Log.e("NurseVM", "Eroare loadTransportCurent: ${e.message}")
@@ -253,7 +348,7 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                         apiService.actualizeazaStatusComanda(
                             token = "Bearer $token",
                             idComanda = livrare.idComanda,
-                            body = mapOf("status" to "FINALIZAT")
+                            body = ActualizareComandaRequest(status = "FINALIZAT")
                         )
                     } catch (e: Exception) {
                         Log.e("NurseVM", "Eroare confirmare ${livrare.id}: ${e.message}")
@@ -284,6 +379,75 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
             }
             .sortedBy { it.nrSalon }
 
+    fun loadAlarme(token: String) {
+        viewModelScope.launch {
+            _isLoadingAlarme.value = true
+            try {
+                val response = apiService.getAlarme("Bearer $token")
+                if (response.isSuccessful) {
+                    _alarme.value = response.body().orEmpty()
+                        .sortedBy { it.rezolvata }
+                    Log.d("NurseVM", "Alarme încărcate: ${_alarme.value.size}")
+                } else {
+                    Log.w("NurseVM", "getAlarme HTTP ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("NurseVM", "Eroare loadAlarme: ${e.message}")
+            } finally {
+                _isLoadingAlarme.value = false
+            }
+        }
+    }
+
+    fun rezolvaAlarma(token: String, idAlarma: Int) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.rezolvaAlarma(
+                    token = "Bearer $token",
+                    idAlarma = idAlarma
+                )
+                if (response.isSuccessful) {
+                    _alarme.value = _alarme.value.map {
+                        if (it.idAlarma == idAlarma) it.copy(rezolvata = true) else it
+                    }.sortedBy { it.rezolvata }
+                    Log.d("NurseVM", "Alarma #$idAlarma marcată ca rezolvată")
+                } else {
+                    _alarme.value = _alarme.value.map {
+                        if (it.idAlarma == idAlarma) it.copy(rezolvata = true) else it
+                    }.sortedBy { it.rezolvata }
+                    Log.w("NurseVM", "rezolvaAlarma HTTP ${response.code()} — fallback local")
+                }
+            } catch (e: Exception) {
+                _alarme.value = _alarme.value.map {
+                    if (it.idAlarma == idAlarma) it.copy(rezolvata = true) else it
+                }.sortedBy { it.rezolvata }
+                Log.e("NurseVM", "Eroare rezolvaAlarma: ${e.message}")
+            }
+        }
+    }
+
+    fun confirmaPreluareaComenzii(token: String, nrSalon: Int, idComenziSelectate: Set<String>) {
+        viewModelScope.launch {
+            idComenziSelectate.forEach { idStr ->
+                val livrare = _detaliiSalon.value.find { it.id == idStr } ?: return@forEach
+                try {
+                    val response = apiService.confirmaAjungereAsistenta(
+                        token = "Bearer $token",
+                        idComanda = livrare.idComanda
+                    )
+                    if (response.isSuccessful) {
+                        Log.d("NurseVM", "Comanda #${livrare.idComanda} confirmată de asistentă (confirmatAsistenta=true, status=FINALIZAT)")
+                    } else {
+                        Log.w("NurseVM", "confirmaAjungere #${livrare.idComanda} HTTP ${response.code()}")
+                    }
+                } catch (e: Exception) {
+                    Log.e("NurseVM", "Eroare confirmaAjungere #${livrare.idComanda}: ${e.message}")
+                }
+            }
+            loadPacientiPentruSalon(nrSalon, token)
+        }
+    }
+
     /** Folosim salonul cerut la încărcare, nu pat.nrSalon din JSON (poate fi învechit). */
     private fun mapComandaToDetalii(comanda: Comanda, nrSalonAfisat: Int): DetaliiLivrare {
         val idPat = comanda.pat?.idPat
@@ -296,7 +460,8 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                 .ifBlank { "Pacient necunoscut" },
             pat = "Pat ${idPat ?: "N/A"}",
             medicament = comanda.prescriptie?.medicament?.denumire ?: "Nespecificat",
-            status = comanda.status
+            status = comanda.status,
+            confirmatAsistenta = comanda.confirmatAsistenta
         )
     }
 }

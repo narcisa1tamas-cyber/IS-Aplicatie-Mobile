@@ -17,28 +17,57 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.is_aplicatie_mobile.network.RetrofitClient
 import com.example.is_aplicatie_mobile.screens.*
+import com.example.is_aplicatie_mobile.session.SessionManager
 import com.example.is_aplicatie_mobile.ui.theme.ISAplicatieMobileTheme
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModelFactory
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModel
 import com.example.is_aplicatie_mobile.viewmodel.NurseViewModelFactory
 import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModel
+import com.example.is_aplicatie_mobile.viewmodel.OperatorViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Inițializează SessionManager cu contextul înainte de orice altceva
+        SessionManager.init(this)
+
         enableEdgeToEdge()
 
         setContent {
             ISAplicatieMobileTheme {
+
+                // Citește sesiunea salvată
+                val sesiuneSalvata = SessionManager.esteLogat()
+                val ecranInitial = when {
+                    sesiuneSalvata && SessionManager.getRol().uppercase() == "ASISTENTA" -> "nurse_dashboard"
+                    sesiuneSalvata -> "main_app"
+                    else -> "splash"
+                }
+
                 // State-uri pentru navigare și sesiune
-                var currentScreen by remember { mutableStateOf("splash") }
-                var userRole by remember { mutableStateOf("") }
-                var userToken by remember { mutableStateOf("") }
+                var currentScreen by remember { mutableStateOf(ecranInitial) }
+                var userRole    by remember { mutableStateOf(SessionManager.getRol()) }
+                var userToken   by remember { mutableStateOf(SessionManager.getToken()) }
+                var userNume    by remember { mutableStateOf(SessionManager.getNume()) }
+                var userPrenume by remember { mutableStateOf(SessionManager.getPrenume()) }
                 var selectedSalonId by remember { mutableIntStateOf(-1) }
 
                 // Inițializare API Service
                 val apiService = RetrofitClient.instance
+
+                // Detectează sesiune expirată (401) și trimite la login
+                val sessionExpirata by SessionManager.sessionExpirata.collectAsState()
+                LaunchedEffect(sessionExpirata) {
+                    if (sessionExpirata) {
+                        userToken   = ""
+                        userRole    = ""
+                        userNume    = ""
+                        userPrenume = ""
+                        currentScreen = "login"
+                    }
+                }
 
                 val authViewModel: AuthViewModel = viewModel(
                     factory = AuthViewModelFactory(apiService)
@@ -49,7 +78,9 @@ class MainActivity : ComponentActivity() {
                 )
 
                 // Instanțiere OperatorViewModel (Unic pe sesiune - ține minte conexiunea!)
-                val operatorViewModel: OperatorViewModel = viewModel()
+                val operatorViewModel: OperatorViewModel = viewModel(
+                    factory = OperatorViewModelFactory(apiService)
+                )
 
                 Box(
                     modifier = Modifier
@@ -74,8 +105,18 @@ class MainActivity : ComponentActivity() {
                                     BackHandler { currentScreen = "splash" }
                                     LoginScreen(
                                         onLoginSuccess = { user ->
-                                            userRole = user.rol
-                                            userToken = user.token
+                                            userRole    = user.rol
+                                            userToken   = user.token
+                                            userNume    = user.nume
+                                            userPrenume = user.prenume
+
+                                            // Salvează sesiunea local
+                                            SessionManager.salveazaSesiune(
+                                                token   = user.token,
+                                                rol     = user.rol,
+                                                nume    = user.nume,
+                                                prenume = user.prenume
+                                            )
 
                                             if (userRole.uppercase() == "ASISTENTA") {
                                                 nurseViewModel.loadSaloaneDinCloud(userToken)
@@ -90,9 +131,14 @@ class MainActivity : ComponentActivity() {
 
                                 "nurse_dashboard" -> {
                                     BackHandler {
-                                        authViewModel.resetLoginState()
-                                        currentScreen = "login"
+                                        // Înapoi din dashboard minimizează aplicația, nu deloghează
                                     }
+                                    LaunchedEffect(Unit) {
+                                        if (userToken.isNotBlank()) {
+                                            nurseViewModel.loadSaloaneDinCloud(userToken)
+                                        }
+                                    }
+
                                     NurseDashboard(
                                         viewModel = nurseViewModel,
                                         token = userToken,
@@ -101,6 +147,7 @@ class MainActivity : ComponentActivity() {
                                             currentScreen = "ward_details"
                                         },
                                         onLogout = {
+                                            SessionManager.stergeSesiune()
                                             authViewModel.resetLoginState()
                                             currentScreen = "login"
                                         }
@@ -126,21 +173,20 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 "main_app" -> {
-                                    // REPARAT: Când apeși înapoi în meniul principal, te deloghează fără să distrugă
-                                    // conexiunea dacă te-ai întors din greșeală dintr-un sub-ecran sau setări
                                     BackHandler {
-                                        authViewModel.resetLoginState()
-                                        currentScreen = "login"
+                                        // Înapoi din meniu principal minimizează aplicația, nu deloghează
                                     }
 
                                     // Încearcă conectarea automată silențioasă prin WebSocket la pornire
                                     LaunchedEffect(Unit) {
+                                        operatorViewModel.setSessionToken(userToken)
                                         operatorViewModel.conecteazaLaDispozitivDisponibil()
                                     }
 
                                     AdminDashboard(
                                         viewModel = operatorViewModel,
                                         onLogout = {
+                                            SessionManager.stergeSesiune()
                                             operatorViewModel.inchideConexiune()
                                             authViewModel.resetLoginState()
                                             currentScreen = "login"
@@ -158,6 +204,10 @@ class MainActivity : ComponentActivity() {
                                         },
                                         onNavigateToTeleghidare = {
                                             currentScreen = "teleoperation"
+                                        },
+                                        onNavigateToAvarii = {
+                                            nurseViewModel.loadAlarme(userToken)
+                                            currentScreen = "avarii"
                                         }
                                     )
                                 }
@@ -184,7 +234,9 @@ class MainActivity : ComponentActivity() {
                                     BackHandler { currentScreen = "main_app" }
                                     ModeSelectionScreen(
                                         viewModel = operatorViewModel,
-                                        onBack = { currentScreen = "main_app" }
+                                        onBack = { currentScreen = "main_app" },
+                                        token = userToken,
+                                        numeOperator = "$userNume $userPrenume".trim()
                                     )
                                 }
 
@@ -192,6 +244,15 @@ class MainActivity : ComponentActivity() {
                                     BackHandler { currentScreen = "main_app" }
                                     TeleoperationScreen(
                                         viewModel = operatorViewModel,
+                                        onBack = { currentScreen = "main_app" }
+                                    )
+                                }
+
+                                "avarii" -> {
+                                    BackHandler { currentScreen = "main_app" }
+                                    AvariiScreen(
+                                        viewModel = nurseViewModel,
+                                        token = userToken,
                                         onBack = { currentScreen = "main_app" }
                                     )
                                 }

@@ -1,9 +1,13 @@
 package com.example.is_aplicatie_mobile.network
 
+import com.example.is_aplicatie_mobile.model.ActualizareComandaRequest
+import com.example.is_aplicatie_mobile.model.Alarma
+import com.example.is_aplicatie_mobile.model.CreeazaAlarmaRequest
 import com.example.is_aplicatie_mobile.model.Comanda
 import com.example.is_aplicatie_mobile.model.LoginRequest
 import com.example.is_aplicatie_mobile.model.LoginResponse
 import com.example.is_aplicatie_mobile.model.Salon
+import com.example.is_aplicatie_mobile.model.TeleghidareOperatorRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -32,8 +36,14 @@ interface HospiHelpApiService {
     suspend fun actualizeazaStatusComanda(
         @Header("Authorization") token: String,
         @Path("id") idComanda: Int,
-        @Body body: Map<String, String>
+        @Body body: ActualizareComandaRequest
     ): Response<Comanda>
+
+    @PUT("api/comenzi/{id}/confirma")
+    suspend fun confirmaAjungereAsistenta(
+        @Header("Authorization") token: String,
+        @Path("id") idComanda: Int
+    ): Response<String>
 
     @GET("api/comenzi/status/ACTIV")
     suspend fun getToateComenzileActive(
@@ -54,4 +64,27 @@ interface HospiHelpApiService {
     suspend fun getToateComenzile(
         @Header("Authorization") token: String
     ): Response<List<Comanda>>
+
+    @GET("api/alarme")
+    suspend fun getAlarme(
+        @Header("Authorization") token: String
+    ): Response<List<Alarma>>
+
+    @POST("api/alarme")
+    suspend fun creeazaAlarma(
+        @Header("Authorization") token: String,
+        @Body body: CreeazaAlarmaRequest
+    ): Response<Alarma>
+
+    @PUT("api/alarme/{id}/rezolva")
+    suspend fun rezolvaAlarma(
+        @Header("Authorization") token: String,
+        @Path("id") idAlarma: Int
+    ): Response<Alarma>
+
+    @POST("api/teleghidare/operator")
+    suspend fun transmiteOperatorTeleghidare(
+        @Header("Authorization") token: String,
+        @Body body: TeleghidareOperatorRequest
+    ): Response<Void>
 }

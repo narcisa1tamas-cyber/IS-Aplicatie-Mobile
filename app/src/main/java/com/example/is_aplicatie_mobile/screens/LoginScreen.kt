@@ -22,7 +22,6 @@ import com.example.is_aplicatie_mobile.model.LoginResponse
 import com.example.is_aplicatie_mobile.viewmodel.AuthViewModel
 import com.example.is_aplicatie_mobile.viewmodel.LoginState
 
-// Paleta de culori unificată cu restul aplicației
 private val BackgroundColor = Color(0xFFF4F8FB)
 private val PrimaryBlue = Color(0xFF1976D2)
 private val DarkBlue = Color(0xFF0D47A1)
@@ -57,7 +56,6 @@ fun LoginScreen(
         verticalArrangement = Arrangement.Center
     ) {
 
-        // Iconița decorativă de deasupra titlului
 
         Spacer(modifier = Modifier.height(24.dp))
 

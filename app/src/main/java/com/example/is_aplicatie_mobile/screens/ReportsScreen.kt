@@ -31,14 +31,10 @@ fun ReportsScreen(viewModel: NurseViewModel, onBack: () -> Unit, token: String) 
         it.status.equals("ACTIVE", ignoreCase = true)
     }
 
-    // MECANISM AUTO-REFRESH:
-    // Interogăm serverul la fiecare 5 secunde.
-    // Dacă o comandă a fost marcată FINALIZAT în DB, la următorul loadTransportCurent
-    // ea nu va mai fi returnată de server (dacă ai modificat query-ul în backend)
     LaunchedEffect(key1 = Unit) {
         while(true) {
             viewModel.loadTransportCurent(token)
-            delay(5000) // Așteaptă 5 secunde până la următoarea verificare
+            delay(5000)
         }
     }
 
@@ -59,7 +55,6 @@ fun ReportsScreen(viewModel: NurseViewModel, onBack: () -> Unit, token: String) 
         }
     ) { padding ->
         if (livrari.isEmpty()) {
-            // Ecran când robotul a terminat toate sarcinile
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -98,7 +93,6 @@ fun ReportsScreen(viewModel: NurseViewModel, onBack: () -> Unit, token: String) 
                     )
                 }
 
-                // Afișăm doar comenzile care sunt în listă (cele ACTIVE)
                 items(livrari) { raport ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),

@@ -26,8 +26,6 @@ class AuthViewModel(private val apiService: HospiHelpApiService) : ViewModel() {
 
         viewModelScope.launch {
             try {
-                // Trimitem cererea către serverul Spring Boot
-                // Folosim email = username conform discuției noastre despre variabile
                 val request = LoginRequest(email = username.trim(), parola = parola.trim())
                 val response = apiService.login(request)
 

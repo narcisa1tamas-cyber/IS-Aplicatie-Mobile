@@ -22,7 +22,7 @@ fun OperatorMenuScreen(
         AlertDialog(
             onDismissRequest = { afiseazaAlerta = false },
             title = { Text("Acces Respins") },
-            text = { Text("Disponibil doar în mod teleghidare.") }, //
+            text = { Text("Disponibil doar în mod teleghidare.") },
             confirmButton = {
                 TextButton(onClick = { afiseazaAlerta = false }) { Text("OK") }
             }
@@ -47,7 +47,7 @@ fun OperatorMenuScreen(
                 if (modCurent == ModControl.TELEGHIDARE) {
                     onNavigateToTeleghidare()
                 } else {
-                    afiseazaAlerta = true // Declansăm alerta dacă nu e setat corect
+                    afiseazaAlerta = true
                 }
             },
             modifier = Modifier.fillMaxWidth().padding(8.dp),

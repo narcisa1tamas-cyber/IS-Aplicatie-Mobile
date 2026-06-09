@@ -40,7 +40,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     private val _isLoadingSalon = MutableStateFlow(false)
     val isLoadingSalon = _isLoadingSalon.asStateFlow()
 
-    /** Paturi ocupate în salonul deschis (din api/paturi) — pentru comparație cu lista de comenzi. */
     private val _paturiOcupateSalonCurent = MutableStateFlow(0)
     val paturiOcupateSalonCurent = _paturiOcupateSalonCurent.asStateFlow()
 
@@ -111,7 +110,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     private suspend fun buildSaloaneFromComenzi(bearer: String): List<SalonOverview> {
         val comenzi = linkedMapOf<Int, Comanda>()
 
-        // Încearcă api/comenzi/status/ACTIV
         val respActiv = runCatching { apiService.getToateComenzileActive(bearer) }.getOrNull()
         Log.d("NurseVM", "ACTIV → code=${respActiv?.code()} body=${respActiv?.body()?.size}")
         respActiv?.body().orEmpty()
@@ -119,7 +117,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
             .forEach { comenzi[it.idComanda] = it }
         Log.d("NurseVM", "ACTIV cu pat != null → ${comenzi.size}")
 
-        // Încearcă api/comenzi/status/IN_ASTEPTARE
         val respAsteptare = runCatching { apiService.getComenzileInAsteptare(bearer) }.getOrNull()
         Log.d("NurseVM", "IN_ASTEPTARE → code=${respAsteptare?.code()} body=${respAsteptare?.body()?.size}")
         respAsteptare?.body().orEmpty()
@@ -127,7 +124,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
             .forEach { comenzi[it.idComanda] = it }
         Log.d("NurseVM", "după IN_ASTEPTARE → total ${comenzi.size}")
 
-        // Încearcă api/comenzi (toate comenzile) ca fallback final
         if (comenzi.isEmpty()) {
             val respAll = runCatching { apiService.getToateComenzile(bearer) }.getOrNull()
             Log.d("NurseVM", "TOATE → code=${respAll?.code()} body=${respAll?.body()?.size}")
@@ -205,9 +201,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
         }
     }
 
-    /**
-     * DETECTARE ȘI FILTRARE COMUNICAȚIE CLOUD -> SALOANE
-     */
     private suspend fun fetchComenziActiveSalon(
         bearer: String,
         nrSalon: Int,
@@ -215,7 +208,7 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
     ): List<Comanda> {
         val merged = linkedMapOf<Int, Comanda>()
 
-        // 1. Apel Toate Comenzile Active (Aici spui ca ai 2 active)
+        // 1. Apel Toate Comenzile Active
         val allActive = apiService.getToateComenzileActive(bearer)
         if (allActive.isSuccessful) {
             val body = allActive.body().orEmpty()
@@ -229,8 +222,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
                 val inSalon = when {
                     patId != null && patId in idPaturiSalon -> true
                     cmd.pat?.nrSalon == nrSalon -> true
-                    // FALLBACK INTELIGENT: Daca pat-ul e null in JSON, dar codul cauta comenzi active,
-                    // le mapam temporar pe salonul curent ca sa nu le ascundem de asistent
                     cmd.pat == null -> {
                         Log.w("NurseVM", "⚠️ Comanda #${cmd.idComanda} are pat NULL. Aplicam fallback pe Salonul $nrSalon")
                         true
@@ -258,7 +249,7 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
             }
         }
 
-        // 3. Apel Comenzi In Asteptare (Aici spui ca ai una in asteptare)
+        // 3. Apel Comenzi In Asteptare
         val inAsteptare = apiService.getComenzileInAsteptare(bearer)
         if (inAsteptare.isSuccessful) {
             val body = inAsteptare.body().orEmpty()
@@ -448,7 +439,6 @@ class NurseViewModel(private val apiService: HospiHelpApiService) : ViewModel() 
         }
     }
 
-    /** Folosim salonul cerut la încărcare, nu pat.nrSalon din JSON (poate fi învechit). */
     private fun mapComandaToDetalii(comanda: Comanda, nrSalonAfisat: Int): DetaliiLivrare {
         val idPat = comanda.pat?.idPat
         return DetaliiLivrare(

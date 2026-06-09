@@ -241,7 +241,6 @@ fun WardDetailScreen(
         )
     }
 
-    // Aici a fost modificarea cheie: se citesc direct datele din viewModel, fără verificarea salonCurent
     val livrari = detaliiSalon
 
     LaunchedEffect(salonId, token) {

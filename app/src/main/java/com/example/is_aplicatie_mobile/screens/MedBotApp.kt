@@ -38,7 +38,7 @@ fun ControlScreen(operatorViewModel: OperatorViewModel = viewModel()) {
                 onBack = { currentRoute = ControlRoute.MENU }
             )
         }
-        // token și numeOperator nu sunt disponibile aici — se folosesc valorile default
+
         ControlRoute.TELEOPERATION -> {
             TeleoperationScreen(
                 viewModel = operatorViewModel,

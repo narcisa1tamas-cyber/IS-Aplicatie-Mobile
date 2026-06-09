@@ -37,6 +37,52 @@ fun AdminDashboard(
 
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var afiseazaAlertaNeconectat  by remember { mutableStateOf(false) }
+    var afiseazaAlertaConectat    by remember { mutableStateOf(false) }
+    var afiseazaAlertaTeleghidare by remember { mutableStateOf(false) }
+
+    if (afiseazaAlertaNeconectat) {
+        AlertDialog(
+            onDismissRequest = { afiseazaAlertaNeconectat = false },
+            confirmButton = {
+                TextButton(onClick = { afiseazaAlertaNeconectat = false }) {
+                    Text("OK", fontWeight = FontWeight.Bold)
+                }
+            },
+            title = { Text("Robot neconectat", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Robotul nu e conectat. Conectați-vă la Bluetooth.") },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (afiseazaAlertaConectat) {
+        AlertDialog(
+            onDismissRequest = { afiseazaAlertaConectat = false },
+            confirmButton = {
+                TextButton(onClick = { afiseazaAlertaConectat = false }) {
+                    Text("OK", fontWeight = FontWeight.Bold)
+                }
+            },
+            title = { Text("Conexiune activă", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Robot conectat.") },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
+    if (afiseazaAlertaTeleghidare) {
+        AlertDialog(
+            onDismissRequest = { afiseazaAlertaTeleghidare = false },
+            confirmButton = {
+                TextButton(onClick = { afiseazaAlertaTeleghidare = false }) {
+                    Text("OK", fontWeight = FontWeight.Bold)
+                }
+            },
+            title = { Text("Acces restricționat", fontWeight = FontWeight.ExtraBold) },
+            text = { Text("Disponibil doar în mod teleghidare.") },
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
+
     LaunchedEffect(errorMessage) {
         errorMessage?.let { msg ->
             val result = snackbarHostState.showSnackbar(
@@ -129,14 +175,20 @@ fun AdminDashboard(
             RobotMenuButton(
                 text = connectButtonText,
                 icon = Icons.Default.Wifi,
-                isActive = connectButtonEnabled,
+                isActive = connectionState != ConnectionState.CONNECTING,
                 color = if (connectionState == ConnectionState.CONNECTED) {
                     Color(0xFF2E7D32)
                 } else {
                     Color(0xFF1976D2)
                 },
                 disabledContainerColor = connectDisabledColor,
-                onClick = { viewModel.conecteazaLaWebSocket() }
+                onClick = {
+                    if (isConnected) {
+                        afiseazaAlertaConectat = true
+                    } else {
+                        viewModel.conecteazaLaWebSocket()
+                    }
+                }
             )
 
             RobotMenuButton(
@@ -158,9 +210,12 @@ fun AdminDashboard(
             RobotMenuButton(
                 text = "Schimbare Mod",
                 icon = Icons.Default.SyncAlt,
-                isActive = isConnected,
+                isActive = true,
                 color = Color(0xFF1976D2),
-                onClick = onNavigateToSchimbareMod
+                onClick = {
+                    if (!isConnected) afiseazaAlertaNeconectat = true
+                    else onNavigateToSchimbareMod()
+                }
             )
 
             val isTeleghidareActive = isConnected && modCurent == ModControl.TELEGHIDARE
@@ -168,9 +223,15 @@ fun AdminDashboard(
             RobotMenuButton(
                 text = "Teleghidare",
                 icon = Icons.Default.Gamepad,
-                isActive = isTeleghidareActive,
+                isActive = true,
                 color = Color(0xFF1976D2),
-                onClick = onNavigateToTeleghidare
+                onClick = {
+                    when {
+                        !isConnected -> afiseazaAlertaNeconectat = true
+                        !isTeleghidareActive -> afiseazaAlertaTeleghidare = true
+                        else -> onNavigateToTeleghidare()
+                    }
+                }
             )
 
             RobotMenuButton(

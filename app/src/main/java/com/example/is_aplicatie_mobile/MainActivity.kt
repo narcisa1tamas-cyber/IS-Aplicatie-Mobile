@@ -30,7 +30,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Inițializează SessionManager cu contextul înainte de orice altceva
         SessionManager.init(this)
 
         enableEdgeToEdge()
@@ -38,7 +37,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             ISAplicatieMobileTheme {
 
-                // Citește sesiunea salvată
                 val sesiuneSalvata = SessionManager.esteLogat()
                 val ecranInitial = when {
                     sesiuneSalvata && SessionManager.getRol().uppercase() == "ASISTENTA" -> "nurse_dashboard"
@@ -46,7 +44,6 @@ class MainActivity : ComponentActivity() {
                     else -> "splash"
                 }
 
-                // State-uri pentru navigare și sesiune
                 var currentScreen by remember { mutableStateOf(ecranInitial) }
                 var userRole    by remember { mutableStateOf(SessionManager.getRol()) }
                 var userToken   by remember { mutableStateOf(SessionManager.getToken()) }
@@ -57,7 +54,6 @@ class MainActivity : ComponentActivity() {
                 // Inițializare API Service
                 val apiService = RetrofitClient.instance
 
-                // Detectează sesiune expirată (401) și trimite la login
                 val sessionExpirata by SessionManager.sessionExpirata.collectAsState()
                 LaunchedEffect(sessionExpirata) {
                     if (sessionExpirata) {
@@ -77,7 +73,6 @@ class MainActivity : ComponentActivity() {
                     factory = NurseViewModelFactory(apiService)
                 )
 
-                // Instanțiere OperatorViewModel (Unic pe sesiune - ține minte conexiunea!)
                 val operatorViewModel: OperatorViewModel = viewModel(
                     factory = OperatorViewModelFactory(apiService)
                 )

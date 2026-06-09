@@ -22,7 +22,6 @@ class RobotBluetoothManager {
     var lastError: String = ""
         private set
 
-    // Adăugat SuppressLint pentru a elimina avertismentul de Deprecate din Java
     @Suppress("DEPRECATION")
     private val adapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
 
@@ -33,14 +32,10 @@ class RobotBluetoothManager {
         return try {
             val pairedDevices = adapter.bondedDevices
 
-            // Încearcă mai întâi după MAC-ul cunoscut al Raspberry Pi
             val device = pairedDevices.find { it.address == RASPBERRY_MAC }
-                // Dacă nu găsește după MAC, caută după nume
                 ?: pairedDevices.find {
                     it.name?.contains("raspberry", ignoreCase = true) == true ||
-                    it.name?.contains("robot", ignoreCase = true) == true ||
-                    it.name?.contains("bot", ignoreCase = true) == true ||
-                    it.name?.contains("pi", ignoreCase = true) == true
+                    it.name?.contains("robot", ignoreCase = true) == true
                 }
 
             if (device == null) {
@@ -54,7 +49,6 @@ class RobotBluetoothManager {
             Log.d("BT", "Conectare la: ${device.name} (${device.address})")
             adapter.cancelDiscovery()
 
-            // Încearcă mai întâi cu UUID SPP standard
             try {
                 socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
                 socket!!.connect()

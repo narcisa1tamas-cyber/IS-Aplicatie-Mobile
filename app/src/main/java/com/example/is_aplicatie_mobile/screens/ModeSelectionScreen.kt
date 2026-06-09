@@ -77,16 +77,14 @@ fun ModeSelectionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-            // ── Subtitlu ──────────────────────────────────────────
             Text(
-                text = "Alege cum va fi controlat robotul",
+                text = "Alege modul de control al robotul",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Start
             )
 
-            // ── Card Mod Automat ──────────────────────────────────
             ModeCard(
                 title = "Mod Automat",
                 subtitle = "Robotul execută comenzile primite din Cloud fără intervenție manuală.",
@@ -100,7 +98,6 @@ fun ModeSelectionScreen(
                 }
             )
 
-            // ── Card Mod Teleghidat ───────────────────────────────
             ModeCard(
                 title = "Mod Teleghidat",
                 subtitle = "Controlezi robotul manual din aplicație în timp real.",
@@ -113,8 +110,6 @@ fun ModeSelectionScreen(
                     viewModel.schimbaModControlCuOperator(ModControl.TELEGHIDARE, token, numeOperator)
                 }
             )
-
-            // ── Banner operator activ ─────────────────────────────
             if (modCurent == ModControl.TELEGHIDARE && !operatorActiv.isNullOrBlank()) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -161,7 +156,6 @@ fun ModeSelectionScreen(
 
             Spacer(modifier = Modifier.weight(1f))
 
-            // ── Notă de jos ───────────────────────────────────────
             Text(
                 text = "Schimbarea modului afectează comportamentul robotului în timp real.",
                 style = MaterialTheme.typography.bodySmall,

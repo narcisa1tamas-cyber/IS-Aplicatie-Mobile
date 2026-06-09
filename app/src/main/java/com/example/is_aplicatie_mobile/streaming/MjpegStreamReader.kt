@@ -17,13 +17,9 @@ object MjpegStreamReader {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(0, TimeUnit.MILLISECONDS)  // fără timeout — stream infinit
+        .readTimeout(0, TimeUnit.MILLISECONDS)
         .build()
 
-    /**
-     * Deschide stream-ul MJPEG și emite frame-uri ca [ImageBitmap] pe măsură ce sosesc.
-     * Detectează frame-urile prin markerii JPEG: SOI (0xFF 0xD8) și EOI (0xFF 0xD9).
-     */
     fun streamFrames(url: String): Flow<ImageBitmap> = flow {
         val request = Request.Builder()
             .url(url)
@@ -49,7 +45,6 @@ object MjpegStreamReader {
                     val b = readBuf[i].toInt() and 0xFF
 
                     if (!inJpeg) {
-                        // Detectează SOI — începutul unui frame JPEG
                         if (prevByte == 0xFF && b == 0xD8) {
                             inJpeg = true
                             jpegBuffer.reset()
@@ -58,7 +53,6 @@ object MjpegStreamReader {
                         }
                     } else {
                         jpegBuffer.write(b)
-                        // Detectează EOI — sfârșitul frame-ului JPEG
                         if (prevByte == 0xFF && b == 0xD9) {
                             inJpeg = false
                             val frameBytes = jpegBuffer.toByteArray()
